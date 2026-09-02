@@ -1,0 +1,31 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: ai-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/suraksha}
+    username: ${SPRING_DATASOURCE_USERNAME:suraksha}
+    password: ${SPRING_DATASOURCE_PASSWORD:suraksha_pw}
+  jpa:
+    hibernate:
+      ddl-auto: none   # reads/updates tables owned by backend — same pattern as fraud-detection-service
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ai-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.suraksha.ai.events"
+        spring.json.value.default.type: com.suraksha.ai.events.ClaimFlaggedEvent
+        spring.json.use.type.headers: false
+
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY:}
+  model: ${ANTHROPIC_MODEL:claude-sonnet-5}
+  # If api-key is blank, every AI feature below falls back to a canned,
+  # clearly-labeled response instead of failing — so the whole stack still
+  # runs and demos end-to-end without anyone needing an API key on day one.

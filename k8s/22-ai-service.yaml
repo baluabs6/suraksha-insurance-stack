@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  namespace: suraksha
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: ai-service }
+  template:
+    metadata:
+      labels: { app: ai-service }
+    spec:
+      securityContext: { runAsNonRoot: true }
+      containers:
+        - name: ai-service
+          image: suraksha/ai-service:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8082 }]
+          envFrom:
+            - configMapRef: { name: suraksha-config }
+          env:
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom: { secretKeyRef: { name: suraksha-secrets, key: SPRING_DATASOURCE_USERNAME } }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: suraksha-secrets, key: SPRING_DATASOURCE_PASSWORD } }
+            - name: ANTHROPIC_API_KEY
+              valueFrom: { secretKeyRef: { name: suraksha-secrets, key: ANTHROPIC_API_KEY } }
+          resources:
+            requests: { cpu: "200m", memory: "384Mi" }
+            limits: { cpu: "400m", memory: "768Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+  namespace: suraksha
+spec:
+  selector: { app: ai-service }
+  ports: [{ port: 80, targetPort: 8082 }]
+  # Internal only in the ingress below — see the README note on why this
+  # service isn't safe to expose without gateway-level auth in front of it.

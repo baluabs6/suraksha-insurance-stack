@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-detection-service
+  namespace: suraksha
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: fraud-detection-service }
+  template:
+    metadata:
+      labels: { app: fraud-detection-service }
+    spec:
+      securityContext: { runAsNonRoot: true }
+      containers:
+        - name: fraud-detection-service
+          image: suraksha/fraud-detection-service:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8081 }]
+          envFrom:
+            - configMapRef: { name: suraksha-config }
+          env:
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom: { secretKeyRef: { name: suraksha-secrets, key: SPRING_DATASOURCE_USERNAME } }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: suraksha-secrets, key: SPRING_DATASOURCE_PASSWORD } }
+          resources:
+            requests: { cpu: "200m", memory: "384Mi" }
+            limits: { cpu: "400m", memory: "768Mi" }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: fraud-detection-hpa
+  namespace: suraksha
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: fraud-detection-service }
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+  # A real deployment should also scale on Kafka consumer lag (via KEDA or a
+  # custom metrics adapter) — CPU alone won't catch a backlog of unscored
+  # claims building up during a renewal-season spike.
