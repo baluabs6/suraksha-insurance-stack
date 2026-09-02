@@ -55,12 +55,12 @@ services:
           property: password
       - key: SPRING_REDIS_HOST
         fromService:
-          type: redis
+          type: keyvalue
           name: suraksha-redis
           property: host
       - key: SPRING_REDIS_PORT
         fromService:
-          type: redis
+          type: keyvalue
           name: suraksha-redis
           property: port
       - key: KAFKA_BOOTSTRAP_SERVERS
@@ -146,8 +146,11 @@ services:
         destination: /index.html
 
   # --- Redis (Key Value) ----------------------------------------------------
-  # Declared implicitly via the redis: block below (Render's native Key Value type)
-
-redis:
-  - name: suraksha-redis
+  # Key Value instances live in `services:` with type "keyvalue" (the old
+  # top-level `redis:` block is not valid Blueprint syntax) and require an
+  # ipAllowList. Empty list = no external access, only reachable from your
+  # other Render services in the same region — which is all this needs.
+  - type: keyvalue
+    name: suraksha-redis
     plan: free       # 25MB, no persistence — fine for cache/session use, not durable state
+    ipAllowList: []
