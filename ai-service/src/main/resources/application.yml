@@ -1,5 +1,5 @@
 server:
-  port: 8082
+  port: ${PORT:8082}
 
 spring:
   application:
@@ -22,6 +22,17 @@ spring:
         spring.json.trusted.packages: "com.suraksha.ai.events"
         spring.json.value.default.type: com.suraksha.ai.events.ClaimFlaggedEvent
         spring.json.use.type.headers: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
 
 anthropic:
   api-key: ${ANTHROPIC_API_KEY:}

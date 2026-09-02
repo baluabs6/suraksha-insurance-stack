@@ -1,0 +1,153 @@
+databases:
+  - name: suraksha-postgres
+    plan: free            # 1GB, expires 30 days after creation — switch to "basic-256mb" ($6/mo) before it matters
+    databaseName: suraksha
+    user: suraksha
+
+services:
+  # --- Kafka (self-hosted, KRaft single-node) --------------------------------
+  # Render has no managed Kafka. This runs the same bitnami/kafka image your
+  # docker-compose already uses, as a private service other services reach
+  # over Render's internal network. No free instance type for private
+  # services — this is the one piece of the stack that isn't $0.
+  - type: pserv
+    name: suraksha-kafka
+    runtime: image
+    plan: starter          # ~$7/mo — cheapest paid tier
+    image:
+      url: docker.io/bitnami/kafka:3.7
+    envVars:
+      - key: KAFKA_CFG_NODE_ID
+        value: "0"
+      - key: KAFKA_CFG_PROCESS_ROLES
+        value: controller,broker
+      - key: KAFKA_CFG_LISTENERS
+        value: PLAINTEXT://:9092,CONTROLLER://:9093
+      - key: KAFKA_CFG_ADVERTISED_LISTENERS
+        value: PLAINTEXT://suraksha-kafka:9092
+      - key: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
+        value: CONTROLLER
+      - key: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
+        value: 0@suraksha-kafka:9093
+      - key: ALLOW_PLAINTEXT_LISTENER
+        value: "yes"
+
+  # --- backend (Spring Boot, public API) --------------------------------------
+  - type: web
+    name: suraksha-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free              # spins down after 15 min idle; upgrade to "starter" for always-on
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: suraksha-postgres
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: suraksha-postgres
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: suraksha-postgres
+          property: password
+      - key: SPRING_REDIS_HOST
+        fromService:
+          type: redis
+          name: suraksha-redis
+          property: host
+      - key: SPRING_REDIS_PORT
+        fromService:
+          type: redis
+          name: suraksha-redis
+          property: port
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        value: suraksha-kafka:9092
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_CORS_ORIGIN
+        value: https://suraksha-frontend.onrender.com   # update after the frontend's real URL is known
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+  # --- fraud-detection-service (Kafka consumer, now also a free-tier-eligible web service) ---
+  - type: web
+    name: suraksha-fraud-detection
+    runtime: docker
+    dockerfilePath: ./fraud-detection-service/Dockerfile
+    dockerContext: ./fraud-detection-service
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: suraksha-postgres
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: suraksha-postgres
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: suraksha-postgres
+          property: password
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        value: suraksha-kafka:9092
+
+  # --- ai-service ---------------------------------------------------------
+  - type: web
+    name: suraksha-ai-service
+    runtime: docker
+    dockerfilePath: ./ai-service/Dockerfile
+    dockerContext: ./ai-service
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: suraksha-postgres
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: suraksha-postgres
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: suraksha-postgres
+          property: password
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        value: suraksha-kafka:9092
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5
+
+  # --- frontend (static site, not a Docker service — free, no spin-down) ----
+  - type: web
+    name: suraksha-frontend
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    rootDir: frontend
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://suraksha-backend.onrender.com
+      - key: VITE_AI_API_BASE_URL
+        value: https://suraksha-ai-service.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # --- Redis (Key Value) ----------------------------------------------------
+  # Declared implicitly via the redis: block below (Render's native Key Value type)
+
+redis:
+  - name: suraksha-redis
+    plan: free       # 25MB, no persistence — fine for cache/session use, not durable state
