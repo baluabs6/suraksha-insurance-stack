@@ -20,7 +20,7 @@ cookie CSRF protection, and the Policy / Claims / Payment domains.
   This is a real second microservice — its own `pom.xml`, own container, own
   Kafka consumer group — deployed and scaled independently of the main
   backend, exactly as designed in the architecture doc.
-- **Three AI features, in a fourth service (`ai-service`)**, each calling the
+- **Seven AI features, in a fourth service (`ai-service`)**, each calling the
   real Anthropic API:
   - **Claim triage summaries** — consumes `claim.flagged` and writes a short,
     factual internal note for adjusters (shown on the dashboard as "AI triage
@@ -33,6 +33,28 @@ cookie CSRF protection, and the Policy / Claims / Payment domains.
     types the customer *doesn't* have) shown on the Policies page, with the
     LLM writing only the one-sentence pitch on top of a gap the rules already
     found — so recommendations stay deterministic even without an API key.
+  - **Claim document/photo analysis** (`POST /api/ai/documents/analyze`) —
+    takes a base64 photo attached to a claim (damage photo, bill, estimate)
+    and Claude's vision input to write a short, factual description an
+    adjuster can skim, and note whether it's consistent with the claimant's
+    own description. Never estimates cost or comments on legitimacy.
+  - **Natural-language claim filing assistant**
+    (`POST /api/ai/claim-assistant/extract`) — customer describes an incident
+    in plain English; the model returns a draft (matched policy, incident
+    date, amount, a cleaned description, and clarifying questions for
+    whatever's missing) to prefill the claim form. The customer still reviews
+    and edits every field before the existing `POST /api/claims` call fires —
+    this endpoint never files anything itself.
+  - **Renewal/premium insight** (`POST /api/ai/renewal-insight`) — same
+    deterministic-factors-plus-LLM-narrative pattern as the recommendation
+    engine: rule-based factors (days to renewal, claims count, risk flags)
+    are computed first, and the model only writes the plain-language
+    explanation on top of them — it never invents a new premium figure.
+  - **Adjuster claim-history Q&A** (`POST /api/ai/adjuster/query`) — an
+    adjuster asks a question in plain English, scoped to a policy or a risk
+    level (or the 25 most recent claims if unscoped); the model answers only
+    from the retrieved claim records and is told to say so when the records
+    don't support an answer, rather than guess.
 
 **Simplified for a demo (call these out before production use):**
 - `backend` itself is still one Spring Boot service, not split into separate
@@ -53,7 +75,13 @@ cookie CSRF protection, and the Policy / Claims / Payment domains.
   Postgres instance today, but the honest long-term fix is to either give it
   its own database populated via events, or have it call back through the
   backend's API instead of touching its tables.
-- No AI service or OCR yet.
+- The new claim-assistant/document-analysis/renewal-insight/adjuster-query
+  endpoints have no dedicated frontend UI yet — `frontend/src/api/aiClient.js`
+  has thin wrapper functions for all four (`analyzeClaimDocument`,
+  `extractClaimFromNarrative`, `getRenewalInsight`, `askAdjuster`) ready to
+  wire into components, same call pattern as the existing chat widget.
+- The adjuster Q&A endpoint has no role check in this demo — see the note in
+  `AdjusterQueryController` for what a production setup needs.
 - `JWT_SECRET` and DB passwords in `docker-compose.yml` are placeholders —
   replace them and use a secrets manager for anything beyond local dev.
 - `ai-service`'s chat and recommendation endpoints are **not behind auth** in
@@ -105,7 +133,10 @@ using the same secret you set as `RAZORPAY_WEBHOOK_SECRET`.
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8080
 - Fraud-detection service: http://localhost:8081 (no public endpoints — it only consumes/produces Kafka events and updates the database)
-- AI service: http://localhost:8082 (`/api/ai/chat`, `/api/ai/recommendations`; triage summaries run via Kafka, no endpoint to call directly)
+- AI service: http://localhost:8082 (`/api/ai/chat`, `/api/ai/recommendations`,
+  `/api/ai/documents/analyze`, `/api/ai/claim-assistant/extract`,
+  `/api/ai/renewal-insight`, `/api/ai/adjuster/query`; triage summaries run
+  via Kafka, no endpoint to call directly)
 - Kafka broker: localhost:9092
 
 Demo login: `demo@suraksha.in` / `Demo@1234` (seeded automatically on first startup).
