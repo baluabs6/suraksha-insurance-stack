@@ -1,0 +1,58 @@
+# Demo-only in-cluster Postgres. As discussed in the architecture doc, a real
+# deployment should point SPRING_DATASOURCE_URL at a managed database (RDS/
+# Cloud SQL) instead — simpler backups, failover, and compliance audits than
+# operating stateful Postgres in-cluster yourself.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: suraksha
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: suraksha
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports: [{ containerPort: 5432 }]
+          env:
+            - name: POSTGRES_DB
+              value: suraksha
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: suraksha-secrets, key: SPRING_DATASOURCE_USERNAME } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: suraksha-secrets, key: POSTGRES_PASSWORD } }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "suraksha"] }
+            initialDelaySeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: postgres-pvc }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: suraksha
+spec:
+  selector: { app: postgres }
+  ports: [{ port: 5432, targetPort: 5432 }]

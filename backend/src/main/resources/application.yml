@@ -16,10 +16,15 @@ spring:
       host: ${SPRING_REDIS_HOST:localhost}
       port: ${SPRING_REDIS_PORT:6379}
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    # Kafka is no longer used — see ClaimEventPublisher, which now calls
+    # fraud-detection-service directly over HTTP. Block left commented out
+    # (rather than deleted) so re-enabling Kafka later is a quick diff if
+    # you move to a platform with managed Kafka.
+    # bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+fraud:
+  service:
+    base-url: ${FRAUD_SERVICE_URL:http://localhost:8081}
 
 app:
   jwt:

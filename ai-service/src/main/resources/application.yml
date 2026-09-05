@@ -12,16 +12,8 @@ spring:
     hibernate:
       ddl-auto: none   # reads/updates tables owned by backend — same pattern as fraud-detection-service
     open-in-view: false
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    consumer:
-      group-id: ai-service
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "com.suraksha.ai.events"
-        spring.json.value.default.type: com.suraksha.ai.events.ClaimFlaggedEvent
-        spring.json.use.type.headers: false
+  # Kafka is no longer used — see ClaimFlaggedController, which replaced the
+  # old @KafkaListener with a direct HTTP endpoint that fraud-detection-service calls.
 
 management:
   endpoints:

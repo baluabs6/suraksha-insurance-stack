@@ -1,0 +1,44 @@
+server:
+  port: ${PORT:8082}
+
+spring:
+  application:
+    name: ai-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/suraksha}
+    username: ${SPRING_DATASOURCE_USERNAME:suraksha}
+    password: ${SPRING_DATASOURCE_PASSWORD:suraksha_pw}
+  jpa:
+    hibernate:
+      ddl-auto: none   # reads/updates tables owned by backend — same pattern as fraud-detection-service
+    open-in-view: false
+  # Kafka is no longer used — see ClaimFlaggedController, which replaced the
+  # old @KafkaListener with a direct HTTP endpoint that fraud-detection-service calls.
+
+app:
+  jwt:
+    # Must match backend's app.jwt.secret exactly — ai-service only verifies
+    # tokens backend issues, it never issues its own.
+    secret: ${JWT_SECRET:dev-only-secret-change-me-before-production-32chars-min}
+  # Shared secret for service-to-service calls (fraud-detection-service ->
+  # ai-service /internal/**). Must match INTERNAL_SERVICE_TOKEN set on
+  # fraud-detection-service.
+  internal-service-token: ${INTERNAL_SERVICE_TOKEN:dev-only-internal-token-change-me-before-production}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY:}
+  model: ${ANTHROPIC_MODEL:claude-sonnet-5}
+  # If api-key is blank, every AI feature below falls back to a canned,
+  # clearly-labeled response instead of failing — so the whole stack still
+  # runs and demos end-to-end without anyone needing an API key on day one.

@@ -23,19 +23,8 @@ spring:
     hibernate:
       ddl-auto: none   # this service only reads/updates existing tables owned by backend
     open-in-view: false
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    consumer:
-      group-id: fraud-detection-service
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "com.suraksha.fraud.events,com.suraksha.backend.claims.events"
-        spring.json.value.default.type: com.suraksha.fraud.events.ClaimSubmittedEvent
-        spring.json.use.type.headers: false
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  # Kafka is no longer used — see ClaimSubmittedController and AiServiceClient,
+  # which replaced the old @KafkaListener/KafkaTemplate with direct HTTP calls.
 
 fraud:
   model-version: v1.0.0
@@ -43,3 +32,7 @@ fraud:
   amount-to-coverage-threshold: 0.5
   # Flag a claim if the same policy already has this many open (non-settled) claims.
   open-claims-threshold: 2
+
+ai:
+  service:
+    base-url: ${AI_SERVICE_URL:http://localhost:8082}

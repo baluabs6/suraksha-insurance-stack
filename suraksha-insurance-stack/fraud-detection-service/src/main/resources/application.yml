@@ -1,0 +1,44 @@
+server:
+  port: ${PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+spring:
+  application:
+    name: fraud-detection-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/suraksha}
+    username: ${SPRING_DATASOURCE_USERNAME:suraksha}
+    password: ${SPRING_DATASOURCE_PASSWORD:suraksha_pw}
+  jpa:
+    hibernate:
+      ddl-auto: none   # this service only reads/updates existing tables owned by backend
+    open-in-view: false
+  # Kafka is no longer used — see ClaimSubmittedController and AiServiceClient,
+  # which replaced the old @KafkaListener/KafkaTemplate with direct HTTP calls.
+
+fraud:
+  model-version: v1.0.0
+  # Flag a claim if it exceeds this fraction of the policy's total coverage.
+  amount-to-coverage-threshold: 0.5
+  # Flag a claim if the same policy already has this many open (non-settled) claims.
+  open-claims-threshold: 2
+
+ai:
+  service:
+    base-url: ${AI_SERVICE_URL:http://localhost:8082}
+
+app:
+  # Shared secret authenticating internal service-to-service calls in both
+  # directions: backend -> this service, and this service -> ai-service.
+  # Must be identical across all three services.
+  internal-service-token: ${INTERNAL_SERVICE_TOKEN:dev-only-internal-token-change-me-before-production}
