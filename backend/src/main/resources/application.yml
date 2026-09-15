@@ -27,12 +27,20 @@ fraud:
     base-url: ${FRAUD_SERVICE_URL:http://localhost:8081}
 
 app:
+  internal-service-token: ${INTERNAL_SERVICE_TOKEN:dev-only-internal-token-change-me-before-production}
   jwt:
     secret: ${JWT_SECRET:dev-only-secret-change-me-before-production-32chars-min}
     access-token-minutes: ${JWT_ACCESS_MINUTES:15}
     refresh-token-days: ${JWT_REFRESH_DAYS:7}
   cors:
     allowed-origin: ${APP_CORS_ORIGIN:http://localhost:5173}
+  crypto:
+    # AES-256 key (32 raw bytes, base64-encoded) for field-level encryption of
+    # PAN/Aadhaar/MFA-secret columns — see EncryptedStringConverter.
+    # DEV-ONLY DEFAULT BELOW. In any real deployment this MUST come from a
+    # KMS or Vault-backed secret, never a static property. Generate a real
+    # one with: python3 -c "import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+    key: ${APP_CRYPTO_KEY:X9hDb5DEYNCL8soppgbL2BhgHs3gqUnUbbpCkr+wJXo=}
 
 razorpay:
   key-id: ${RAZORPAY_KEY_ID:}

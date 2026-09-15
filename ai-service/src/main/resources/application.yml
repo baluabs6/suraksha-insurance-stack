@@ -15,6 +15,16 @@ spring:
   # Kafka is no longer used — see ClaimFlaggedController, which replaced the
   # old @KafkaListener with a direct HTTP endpoint that fraud-detection-service calls.
 
+app:
+  jwt:
+    # Must match backend's app.jwt.secret exactly — ai-service only verifies
+    # tokens backend issues, it never issues its own.
+    secret: ${JWT_SECRET:dev-only-secret-change-me-before-production-32chars-min}
+  # Shared secret for service-to-service calls (fraud-detection-service ->
+  # ai-service /internal/**). Must match INTERNAL_SERVICE_TOKEN set on
+  # fraud-detection-service.
+  internal-service-token: ${INTERNAL_SERVICE_TOKEN:dev-only-internal-token-change-me-before-production}
+
 management:
   endpoints:
     web:

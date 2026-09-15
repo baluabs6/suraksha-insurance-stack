@@ -13,8 +13,10 @@ public class UserResponse {
     String email;
     Role role;
     boolean kycVerified;
+    boolean mfaEnabled;
 
     public static UserResponse from(User user) {
-        return new UserResponse(user.getId(), user.getFullName(), user.getEmail(), user.getRole(), user.isKycVerified());
+        return new UserResponse(user.getId(), user.getFullName(), user.getEmail(), user.getRole(),
+                user.isKycVerified(), user.isMfaEnabled());
     }
 }

@@ -36,3 +36,9 @@ fraud:
 ai:
   service:
     base-url: ${AI_SERVICE_URL:http://localhost:8082}
+
+app:
+  # Shared secret authenticating internal service-to-service calls in both
+  # directions: backend -> this service, and this service -> ai-service.
+  # Must be identical across all three services.
+  internal-service-token: ${INTERNAL_SERVICE_TOKEN:dev-only-internal-token-change-me-before-production}

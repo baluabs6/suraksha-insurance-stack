@@ -1,6 +1,7 @@
 package com.suraksha.ai.chat;
 
 import com.suraksha.ai.client.AnthropicClient;
+import com.suraksha.ai.security.PromptGuard;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -12,7 +13,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChatController {
 
-    private static final String SYSTEM_PROMPT = """
+    private static final String SYSTEM_PROMPT = PromptGuard.ANTI_INJECTION_PREAMBLE + """
+
             You are Suraksha's customer support assistant for an Indian insurance
             platform covering health, motor, and life policies. Answer questions
             about how policies, claims, and payments generally work. Use the
@@ -35,15 +37,18 @@ public class ChatController {
         List<String> policies = req.getPolicySummaries() == null ? List.of() : req.getPolicySummaries();
         String context = policies.isEmpty()
                 ? "The customer has no policies on file yet."
-                : "The customer's policies: " + String.join("; ", policies);
+                : "The customer's policies: " + PromptGuard.wrapUntrusted(String.join("; ", policies));
 
-        String userMessage = context + "\n\nCustomer question: " + req.getMessage();
+        String userMessage = context + "\n\nCustomer question: " + PromptGuard.wrapUntrusted(req.getMessage());
 
         String fallback = "I can't reach the assistant service right now "
                 + "(ANTHROPIC_API_KEY not configured on ai-service). "
                 + "For anything urgent, please use the claims section of the app or contact support directly.";
 
-        String reply = anthropicClient.complete(SYSTEM_PROMPT, userMessage, fallback);
+        String rawReply = anthropicClient.complete(SYSTEM_PROMPT, userMessage, fallback);
+        String safeFallback = "I can't answer that the way it was phrased — for anything about a specific "
+                + "claim's outcome, please check the claims section of the app or contact support.";
+        String reply = PromptGuard.enforceNoDecisionLanguage(rawReply, safeFallback);
         return new ChatResponse(reply);
     }
 }

@@ -31,6 +31,11 @@ public class ClaimEventPublisher {
     @Value("${fraud.service.base-url}")
     private String fraudServiceBaseUrl;
 
+    // Must match fraud-detection-service's app.internal-service-token —
+    // authenticates this service-to-service call.
+    @Value("${app.internal-service-token}")
+    private String internalServiceToken;
+
     // Render's private-network fromService/hostport value has no scheme
     // (e.g. "suraksha-fraud-detection:10000"); local/docker-compose values
     // already include one. Normalize so both work without extra config.
@@ -53,6 +58,7 @@ public class ClaimEventPublisher {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(resolvedBaseUrl() + "/internal/claims/submitted"))
                     .header("Content-Type", "application/json")
+                    .header("X-Internal-Service-Token", internalServiceToken)
                     .timeout(Duration.ofSeconds(10))
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();

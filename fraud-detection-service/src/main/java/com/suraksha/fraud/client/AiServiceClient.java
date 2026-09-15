@@ -32,6 +32,11 @@ public class AiServiceClient {
     @Value("${ai.service.base-url}")
     private String aiServiceBaseUrl;
 
+    // Must match ai-service's app.internal-service-token — authenticates this
+    // service-to-service call now that /internal/** requires it.
+    @Value("${app.internal-service-token}")
+    private String internalServiceToken;
+
     // Same normalization as backend's ClaimEventPublisher — Render's private
     // fromService/hostport value has no scheme.
     private String resolvedBaseUrl() {
@@ -44,6 +49,7 @@ public class AiServiceClient {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(resolvedBaseUrl() + "/internal/claims/flagged"))
                     .header("Content-Type", "application/json")
+                    .header("X-Internal-Service-Token", internalServiceToken)
                     .timeout(Duration.ofSeconds(15))
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
