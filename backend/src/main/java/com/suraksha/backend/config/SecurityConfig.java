@@ -53,6 +53,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/payments/webhook").permitAll()
                 .requestMatchers("/actuator/health/**", "/actuator/prometheus").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/adjuster/**").hasAnyRole("CLAIMS_ADJUSTER", "ADMIN")
+                .requestMatchers("/api/agent/**").hasAnyRole("AGENT", "ADMIN")
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

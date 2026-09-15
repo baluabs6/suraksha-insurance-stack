@@ -15,6 +15,13 @@ spring:
   # Kafka is no longer used — see ClaimFlaggedController, which replaced the
   # old @KafkaListener with a direct HTTP endpoint that fraud-detection-service calls.
 
+fraud:
+  # Mirrors fraud-detection-service's thresholds exactly — see the comment on
+  # FraudSignalExplainer for why this is a separate copy. Keep these two in
+  # sync if you tune fraud-detection-service's values.
+  amount-to-coverage-threshold: ${FRAUD_AMOUNT_TO_COVERAGE_THRESHOLD:0.5}
+  open-claims-threshold: ${FRAUD_OPEN_CLAIMS_THRESHOLD:2}
+
 app:
   jwt:
     # Must match backend's app.jwt.secret exactly — ai-service only verifies

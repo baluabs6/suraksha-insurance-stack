@@ -26,6 +26,7 @@ public class ClaimController {
     private final PolicyRepository policyRepository;
     private final UserRepository userRepository;
     private final ClaimEventPublisher claimEventPublisher;
+    private final ClaimStatusHistoryRepository claimStatusHistoryRepository;
 
     @GetMapping
     public List<Claim> myClaims(Authentication auth) {
@@ -57,6 +58,13 @@ public class ClaimController {
                 .build();
 
         claimRepository.save(claim);
+        claimStatusHistoryRepository.save(ClaimStatusHistory.builder()
+                .claimId(claim.getId())
+                .fromStatus(null)
+                .toStatus(ClaimStatus.SUBMITTED)
+                .changedByUserId(null)
+                .note(null)
+                .build());
         claimEventPublisher.publishSubmitted(claim);
         return ResponseEntity.status(201).body(claim);
     }
@@ -68,5 +76,15 @@ public class ClaimController {
                 .filter(c -> c.getUser().getId().equals(userId))
                 .<ResponseEntity<?>>map(ResponseEntity::ok)
                 .orElse(ResponseEntity.status(404).body(Map.of("message", "Claim not found for this account.")));
+    }
+
+    @GetMapping("/{id}/history")
+    public ResponseEntity<?> history(@PathVariable UUID id, Authentication auth) {
+        UUID userId = UUID.fromString(auth.getName());
+        boolean owned = claimRepository.findById(id).map(c -> c.getUser().getId().equals(userId)).orElse(false);
+        if (!owned) {
+            return ResponseEntity.status(404).body(Map.of("message", "Claim not found for this account."));
+        }
+        return ResponseEntity.ok(claimStatusHistoryRepository.findByClaimIdOrderByOccurredAtAsc(id));
     }
 }

@@ -24,6 +24,11 @@ public class ClaimRecord {
     private Double riskScore;
     private String riskLevel;
 
+    // Mirrors com.suraksha.backend.claims.ClaimStatus — read-only here, this
+    // service never transitions a claim's status itself.
+    @Enumerated(EnumType.STRING)
+    private ClaimStatusView status;
+
     // Written by this service after a triage summary is generated.
     private String aiSummary;
     private String aiRecommendation;

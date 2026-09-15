@@ -66,4 +66,15 @@ public class Claim {
 
     @Column(length = 2000)
     private String aiRecommendation;
+
+    // Internal note an adjuster leaves when moving a claim to APPROVED/REJECTED/
+    // SETTLED — never shown to the customer directly, but used as grounding
+    // context when ai-service drafts the customer-facing decision letter.
+    @Column(length = 2000)
+    private String decisionNotes;
+
+    @Column(name = "status_updated_by")
+    private UUID statusUpdatedBy;
+
+    private Instant statusUpdatedAt;
 }
