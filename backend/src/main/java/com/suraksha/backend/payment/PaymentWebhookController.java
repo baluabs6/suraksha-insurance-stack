@@ -13,15 +13,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 
-/**
- * Receives Razorpay's server-to-server webhook — this, not the checkout
- * modal's client-side success callback, is the only source of truth for
- * whether money actually moved. Public endpoint by necessity (Razorpay's
- * servers can't hold a session cookie or CSRF token), so it's excluded from
- * both auth and CSRF in SecurityConfig — the HMAC signature is what protects
- * it instead. Configure this URL in the Razorpay dashboard as the webhook
- * target for the "payment.captured" and "payment.failed" events.
- */
 @RestController
 @RequiredArgsConstructor
 @Slf4j

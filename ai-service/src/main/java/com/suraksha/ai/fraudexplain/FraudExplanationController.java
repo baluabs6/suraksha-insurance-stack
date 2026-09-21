@@ -14,14 +14,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * On-demand version of the triage note: an adjuster can ask "why does this
- * claim have this risk score?" for ANY scored claim, not just the ones that
- * were flagged and got an automatic triage note. The underlying signals are
- * recomputed by FraudSignalExplainer (rule-based, deterministic); the LLM
- * only narrates them, same "explain, never decide" pattern as everywhere
- * else in this service.
- */
 @RestController
 @RequestMapping("/api/ai/fraud-explanation")
 @RequiredArgsConstructor

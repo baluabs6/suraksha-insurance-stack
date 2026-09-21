@@ -12,16 +12,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Conversational counterpart to RecommendationController: instead of
- * triggering on a coverage gap, the customer describes their situation in
- * plain language ("I just started riding a motorcycle to work and don't
- * have anything for my health, what should I look at?") and gets a
- * comparison across the plans that plausibly apply. Same "rules pick the
- * candidates, the model only writes the comparison" split as the rest of
- * this service — candidatePlans always come straight from PlanCatalog, never
- * from the model.
- */
 @RestController
 @RequestMapping("/api/ai/policy-comparison")
 @RequiredArgsConstructor

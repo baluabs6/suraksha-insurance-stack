@@ -20,12 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Minimal IRDAI-style grievance-redressal flow: customers file a complaint
- * and get a reference number they can quote; adjusters/admins triage and
- * resolve it. See Grievance.java for what's simplified vs. a real
- * integration with IRDAI's Integrated Grievance Management System.
- */
 @RestController
 @RequiredArgsConstructor
 public class GrievanceController {

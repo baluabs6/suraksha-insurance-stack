@@ -12,13 +12,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-// Originally published to Kafka's "claim.submitted" topic and consumed by
-// fraud-detection-service. Rewritten as a direct internal HTTP call so this
-// stack can run on platforms with no managed Kafka (e.g. Render's free
-// tier). Kept fire-and-forget on purpose: the user's claim submission must
-// never wait on — or fail because of — fraud-detection-service being slow,
-// asleep (free-tier cold start), or down. If that matters in production,
-// replace this with a durable outbox pattern instead of an HTTP call.
 @Component
 @Slf4j
 public class ClaimEventPublisher {
@@ -31,14 +24,9 @@ public class ClaimEventPublisher {
     @Value("${fraud.service.base-url}")
     private String fraudServiceBaseUrl;
 
-    // Must match fraud-detection-service's app.internal-service-token —
-    // authenticates this service-to-service call.
     @Value("${app.internal-service-token}")
     private String internalServiceToken;
 
-    // Render's private-network fromService/hostport value has no scheme
-    // (e.g. "suraksha-fraud-detection:10000"); local/docker-compose values
-    // already include one. Normalize so both work without extra config.
     private String resolvedBaseUrl() {
         return fraudServiceBaseUrl.contains("://") ? fraudServiceBaseUrl : "http://" + fraudServiceBaseUrl;
     }
@@ -66,9 +54,6 @@ public class ClaimEventPublisher {
             httpClient.sendAsync(request, HttpResponse.BodyHandlers.discarding())
                     .whenComplete((response, ex) -> {
                         if (ex != null) {
-                            // Don't fail the user's claim submission if fraud-detection-service
-                            // is unreachable — log it; the claim still exists and can be scored
-                            // later by a backfill job. Never let async scoring block the request.
                             log.error("Failed to notify fraud-detection-service for claim {}", claim.getId(), ex);
                         } else if (response.statusCode() >= 300) {
                             log.error("fraud-detection-service returned {} for claim {}",

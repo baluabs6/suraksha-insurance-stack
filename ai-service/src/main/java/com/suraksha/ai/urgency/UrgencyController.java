@@ -11,15 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Set;
 
-/**
- * Classifies a claim narrative or chat message for operational urgency
- * (routing/triage only) — e.g. an ongoing hospitalization or a claim
- * describing an active emergency should reach a human faster than a routine
- * fender-bender. This is not a clinical or safety judgment: it never
- * diagnoses, assesses risk to a person, or takes any action itself — it only
- * labels text for a human queue to prioritize, and defaults to MEDIUM
- * whenever the signal is ambiguous rather than guessing.
- */
 @RestController
 @RequestMapping("/api/ai/urgency")
 @RequiredArgsConstructor

@@ -12,14 +12,11 @@ public class RenewalInsightRequest {
     private String policyId;
 
     private String planName;
-    private String type;               // HEALTH / MOTOR / LIFE
+    private String type;
     private BigDecimal coverageAmount;
     private BigDecimal premium;
     private LocalDate endDate;
 
-    // Claims-history counts on this policy — the frontend already has this
-    // from GET /api/claims, filtered client-side to this policy, same
-    // client-supplied-context pattern as chat/recommendations.
     private int totalClaimsFiled;
     private int highRiskClaims;
     private int mediumRiskClaims;

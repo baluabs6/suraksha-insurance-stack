@@ -10,18 +10,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Internal-facing sibling of RenewalInsightController: instead of explaining
- * the renewal to the customer, this scores how likely a policyholder is to
- * lapse/not-renew, for an agent's retention outreach list. Same shape as
- * everywhere else here — a rule-based band computed first, LLM only narrates
- * suggested outreach on top of it.
- *
- * This is a simple weighted-rule heuristic, not a trained model — treat the
- * band as a triage prioritization signal, not a calibrated probability. A
- * real churn model would be trained on actual renewal/lapse outcomes, which
- * this demo dataset doesn't have.
- */
 @RestController
 @RequestMapping("/api/ai/churn-risk")
 @RequiredArgsConstructor

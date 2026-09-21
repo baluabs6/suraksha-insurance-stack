@@ -11,11 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/**
- * Read-only viewer over the append-only audit trail. Already gated by
- * SecurityConfig's /api/admin/** -> ADMIN rule; @PreAuthorize here is
- * defense-in-depth against that rule ever being loosened by mistake.
- */
 @RestController
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")

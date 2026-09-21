@@ -41,7 +41,6 @@ public class JwtService {
         this.redisTemplate = redisTemplate;
     }
 
-    // ---- Access tokens ----------------------------------------------------
 
     public String generateAccessToken(User user) {
         Instant now = Instant.now();
@@ -64,10 +63,6 @@ public class JwtService {
         }
     }
 
-    // ---- MFA pending tokens -------------------------------------------------
-    // Issued right after a correct password when MFA is enabled, so the
-    // password check and the TOTP check are two separate steps, neither of
-    // which alone is enough to obtain a real session.
 
     public String generateMfaPendingToken(UUID userId) {
         Instant now = Instant.now();
@@ -80,7 +75,6 @@ public class JwtService {
                 .compact();
     }
 
-    /** @return the pending user's id, or null if the token is invalid, expired, or not an MFA-pending token. */
     public UUID validateMfaPendingToken(String token) {
         Claims claims = parseAccessToken(token);
         if (claims == null || !MFA_PENDING_PURPOSE.equals(claims.get("purpose", String.class))) {
@@ -89,15 +83,6 @@ public class JwtService {
         return UUID.fromString(claims.getSubject());
     }
 
-    // ---- Refresh tokens: rotate-on-use with reuse detection ----------------
-    //
-    // Each login starts a new "family" (one per session/device). Every
-    // refresh call invalidates the presented token and issues a new one in
-    // the same family. If a token that has already been rotated out is ever
-    // presented again, that's a strong signal of theft (an attacker replaying
-    // a token they captured earlier) — the whole family is revoked and the
-    // device must log in again, rather than trusting a token that shouldn't
-    // still be usable.
 
     public String generateAndStoreRefreshToken(UUID userId) {
         String familyId = UUID.randomUUID().toString();

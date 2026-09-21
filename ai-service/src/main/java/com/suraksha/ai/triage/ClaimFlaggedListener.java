@@ -11,12 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Turns a fraud-detection flag into a note an adjuster can actually act on in
- * a few seconds, instead of a bare risk score and a list of rule names.
- * Only listens to claim.flagged — unflagged claims don't need a human review
- * note, so we don't spend a model call on every single claim filed.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

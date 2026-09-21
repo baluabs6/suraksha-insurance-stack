@@ -14,14 +14,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Rule-based risk scoring, deliberately simple and explainable — this is the
- * kind of thing a real fraud model would eventually replace (XGBoost/scikit-
- * learn trained on historical claims), but the same shape applies: pull
- * signals, produce a 0–1 score, classify into a risk band, and always keep
- * a list of *why* it was flagged, since insurers need to justify a manual
- * review decision, not just show a number.
- */
 @Service
 @RequiredArgsConstructor
 public class FraudScoringService {
@@ -62,9 +54,6 @@ public class FraudScoringService {
             score += 0.35;
         }
 
-        // A round-number claim amount is a very weak heuristic signal on its own,
-        // but combined with the others it nudges the score — a real model would
-        // learn a proper weighting instead of these hand-picked increments.
         if (event.claimAmount().remainder(BigDecimal.valueOf(1000)).compareTo(BigDecimal.ZERO) == 0) {
             score += 0.05;
         }

@@ -18,8 +18,6 @@ public class DocumentUploadRequest {
     @NotBlank(message = "Content type is required.")
     private String contentType;
 
-    // Raw base64, no "data:...;base64," prefix — frontend strips that first,
-    // same convention as the ai-service document analysis endpoint.
     @NotBlank(message = "File content is required.")
     private String base64Content;
 

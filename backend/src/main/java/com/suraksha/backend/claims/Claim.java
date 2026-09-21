@@ -53,23 +53,16 @@ public class Claim {
     @Column(nullable = false)
     private Instant submittedAt = Instant.now();
 
-    // Populated asynchronously by the fraud-detection service after it
-    // consumes the claim.submitted event. Null until scored.
     private Double riskScore;
 
     private String riskLevel;
 
-    // Populated asynchronously by ai-service after a flagged claim triggers
-    // a triage summary. Null for claims that were never flagged.
     @Column(length = 2000)
     private String aiSummary;
 
     @Column(length = 2000)
     private String aiRecommendation;
 
-    // Internal note an adjuster leaves when moving a claim to APPROVED/REJECTED/
-    // SETTLED — never shown to the customer directly, but used as grounding
-    // context when ai-service drafts the customer-facing decision letter.
     @Column(length = 2000)
     private String decisionNotes;
 

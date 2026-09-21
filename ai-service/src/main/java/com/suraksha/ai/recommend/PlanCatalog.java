@@ -4,9 +4,6 @@ import com.suraksha.ai.model.PolicyTypeView;
 
 import java.util.List;
 
-// Mirrors the plan cards shown on the frontend landing page — kept here so
-// the recommendation engine has something concrete to point to. In a real
-// system this would be a Plans table owned by the policy service instead.
 public class PlanCatalog {
 
     public record Plan(PolicyTypeView type, String name, String pitchTemplate) {

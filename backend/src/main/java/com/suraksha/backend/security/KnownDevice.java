@@ -22,7 +22,6 @@ public class KnownDevice {
     @Column(nullable = false)
     private UUID userId;
 
-    /** SHA-256 hash of User-Agent + coarse IP (see DeviceFingerprintService) — never store raw IP/UA long-term. */
     @Column(nullable = false)
     private String deviceFingerprint;
 

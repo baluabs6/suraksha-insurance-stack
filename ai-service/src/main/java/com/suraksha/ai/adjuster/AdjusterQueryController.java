@@ -12,21 +12,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Lets a claims adjuster ask a question in plain English over a scoped slice
- * of claim history ("what's the pattern across these flagged claims?",
- * "has this policy had prior claims?") instead of reading rows by hand.
- * This is retrieval, not open-ended chat: the question is only ever answered
- * against the specific claims fetched below, capped at 25, and the system
- * prompt forbids the model from answering anything the retrieved data
- * doesn't support.
- *
- * Now behind JWT auth + role check (SecurityConfig restricts /api/ai/adjuster/**
- * to CLAIMS_ADJUSTER/ADMIN). Claim descriptions are free text a claimant
- * wrote, so they're wrapped as untrusted content (PromptGuard) before going
- * into the prompt, and the response is scanned for decision language as a
- * backstop to the system prompt's own "never decide" instruction.
- */
 @RestController
 @RequestMapping("/api/ai/adjuster")
 @RequiredArgsConstructor
@@ -73,8 +58,6 @@ public class AdjusterQueryController {
                     "No claims matched that scope, so there's nothing to answer from.", 0, false);
         }
 
-        // Descriptions are free text a claimant wrote — wrap each one so the
-        // model treats it purely as data, never as instructions.
         String claimContext = claims.stream()
                 .map(c -> "- id=%s type=%s amount=₹%s incidentDate=%s riskLevel=%s riskScore=%s description=%s".formatted(
                         c.getId(), c.getClaimType(), c.getClaimAmount(), c.getIncidentDate(),

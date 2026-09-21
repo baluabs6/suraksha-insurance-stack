@@ -14,12 +14,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-/**
- * Thin wrapper around the Anthropic Messages API. Every caller goes through
- * complete(systemPrompt, userMessage) and gets a plain string back — callers
- * never see whether that came from a real model call or the no-key fallback,
- * which keeps the triage/chat/recommendation code simple.
- */
 @Component
 @Slf4j
 public class AnthropicClient {
@@ -64,13 +58,6 @@ public class AnthropicClient {
         }
     }
 
-    /**
-     * Same contract as complete(), but attaches a base64-encoded image
-     * alongside the text prompt using Claude's vision input. Used by the
-     * claim document/photo analysis feature — nothing else in this service
-     * needs image input, so this stays a separate method rather than
-     * complicating the plain-text path every other caller uses.
-     */
     public String completeWithImage(String systemPrompt, String userMessage,
                                      String base64Image, String mediaType, String fallback) {
         if (!isConfigured()) {

@@ -15,13 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Everything a claims adjuster needs to actually process a claim, which the
- * original API surface didn't have — claims could be filed and fraud-scored,
- * but nothing ever moved them out of SUBMITTED. Restricted to CLAIMS_ADJUSTER
- * and ADMIN via method security; SecurityConfig also gates the URL prefix as
- * a second layer.
- */
 @RestController
 @RequestMapping("/api/adjuster/claims")
 @RequiredArgsConstructor

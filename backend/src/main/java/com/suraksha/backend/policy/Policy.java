@@ -26,9 +26,6 @@ public class Policy {
     @JsonIgnoreProperties({"passwordHash", "email", "role", "kycVerified", "createdAt"})
     private User user;
 
-    // Optional — the AGENT-role user this policy is attributed to, if it was
-    // sold through an agent rather than bought directly. Null for direct
-    // (self-service) purchases.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "agent_id")
     @JsonIgnoreProperties({"passwordHash", "email", "role", "kycVerified", "createdAt"})

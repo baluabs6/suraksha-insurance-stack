@@ -9,14 +9,6 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
 
-/**
- * Lightweight "new device" detection: fingerprints User-Agent + the /24 of
- * the client IP (coarse on purpose — full IPs change too often on mobile
- * networks to be a stable fingerprint, and we don't want to store raw IPs
- * indefinitely anyway). Not meant to be a strong device identifier on its
- * own — it's a low-cost trigger for "this looks like a new device, log it
- * and consider a step-up challenge," not a security boundary by itself.
- */
 @Service
 @RequiredArgsConstructor
 public class DeviceFingerprintService {
@@ -35,7 +27,6 @@ public class DeviceFingerprintService {
         }
     }
 
-    /** @return true if this is the first time this fingerprint has been seen for this user (i.e. a new device). */
     public boolean recordAndCheckIfNew(UUID userId, String fingerprint) {
         var existing = knownDeviceRepository.findByUserIdAndDeviceFingerprint(userId, fingerprint);
         Instant now = Instant.now();

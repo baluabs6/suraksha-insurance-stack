@@ -24,7 +24,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health/**", "/actuator/prometheus").permitAll()
                 .requestMatchers("/internal/**").hasRole("INTERNAL_SERVICE")
-                .anyRequest().denyAll() // this service exposes nothing else publicly
+                .anyRequest().denyAll()
             )
             .addFilterBefore(internalServiceAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

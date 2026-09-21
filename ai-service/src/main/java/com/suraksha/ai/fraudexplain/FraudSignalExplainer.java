@@ -12,20 +12,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Recomputes the same human-readable signals fraud-detection-service's
- * FraudScoringService used to arrive at a claim's riskScore/riskLevel — this
- * service never receives the flag list fraud-detection-service computed
- * (only the final score/level get written to the claims table), so if an
- * adjuster wants "why" for any scored claim, not just the ones that were
- * flagged at submission time, this is recomputed here rather than plumbing
- * a new column through two other services.
- *
- * Deliberately mirrors FraudScoringService's thresholds and logic exactly —
- * see that class in fraud-detection-service. If the thresholds there change,
- * update fraud.amount-to-coverage-threshold / fraud.open-claims-threshold
- * here to match.
- */
 @Component
 @RequiredArgsConstructor
 public class FraudSignalExplainer {

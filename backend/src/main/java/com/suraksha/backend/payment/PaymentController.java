@@ -27,14 +27,6 @@ public class PaymentController {
         return paymentRepository.findByPolicyUserIdOrderByPaidAtDesc(UUID.fromString(auth.getName()));
     }
 
-    /**
-     * Starts a payment. If Razorpay isn't configured, falls back to the old
-     * demo behavior (mark PAID immediately) so the stack still works without
-     * a merchant account. If it is configured, creates a real Razorpay order
-     * and leaves the payment PENDING — the webhook below is the only thing
-     * that ever marks it PAID. Never trust a client-side "it worked" callback
-     * for money; that's spoofable by anyone who controls the browser.
-     */
     @PostMapping("/{policyId}/pay")
     public ResponseEntity<?> initiatePayment(@PathVariable UUID policyId, Authentication auth) {
         UUID userId = UUID.fromString(auth.getName());

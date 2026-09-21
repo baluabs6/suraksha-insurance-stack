@@ -39,8 +39,6 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // Double-submit cookie CSRF protection: token cookie is readable by JS,
-            // the frontend echoes it back as the X-XSRF-TOKEN header on mutating requests.
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .ignoringRequestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/refresh",

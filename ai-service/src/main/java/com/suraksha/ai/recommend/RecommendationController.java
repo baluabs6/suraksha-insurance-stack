@@ -9,13 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Deliberately rule-based at its core (own a coverage gap → recommend the
- * matching plan), so recommendations are deterministic and explainable, and
- * the feature works even with no API key configured. The LLM is used only to
- * write the personalized pitch sentence on top of a gap the rules already
- * found — never to decide what to recommend.
- */
 @RestController
 @RequestMapping("/api/ai/recommendations")
 @RequiredArgsConstructor
@@ -36,7 +29,7 @@ public class RecommendationController {
         List<Recommendation> results = new ArrayList<>();
 
         for (PlanCatalog.Plan plan : PlanCatalog.ALL) {
-            if (owned.contains(plan.type())) continue; // already covered — not a gap
+            if (owned.contains(plan.type())) continue;
 
             String userMessage = "Plan: %s (%s). What it covers: %s".formatted(
                     plan.name(), plan.type(), plan.pitchTemplate());

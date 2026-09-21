@@ -16,12 +16,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 
-/**
- * Thin wrapper around Razorpay's Orders API, following the same shape as
- * AnthropicClient: a plain HTTP call, and a graceful fallback when no real
- * credentials are configured, so the whole stack still runs and demos
- * end-to-end without anyone needing a merchant account on day one.
- */
 @Component
 @Slf4j
 public class RazorpayClient {
@@ -50,10 +44,6 @@ public class RazorpayClient {
     public record OrderResult(String orderId, boolean success) {
     }
 
-    /**
-     * Amount must be in paise (₹1 = 100 paise) — Razorpay's API works in the
-     * smallest currency unit, same convention as Stripe's cents.
-     */
     public OrderResult createOrder(BigDecimal amountInRupees, String receipt) {
         if (!isConfigured()) {
             return new OrderResult(null, false);

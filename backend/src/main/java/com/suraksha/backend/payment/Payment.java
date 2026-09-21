@@ -30,8 +30,6 @@ public class Payment {
     @Column(nullable = false)
     private String method;
 
-    // Razorpay order id, set at creation time — used to match the
-    // asynchronous webhook confirmation back to this row.
     private String orderId;
 
     private String gatewayTxnId;

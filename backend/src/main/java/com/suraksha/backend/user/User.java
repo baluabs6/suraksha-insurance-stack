@@ -32,9 +32,6 @@ public class User {
     @Column(nullable = false)
     private boolean kycVerified = false;
 
-    // Encrypted at the application layer with AES-256-GCM before it ever
-    // reaches the database — see EncryptedStringConverter. A raw DB dump or
-    // unauthorized read of a replica does not expose these in plaintext.
     @Convert(converter = EncryptedStringConverter.class)
     @Column
     private String panNumber;
@@ -43,8 +40,6 @@ public class User {
     @Column
     private String aadhaarNumber;
 
-    // TOTP shared secret — also encrypted at rest, since anyone who reads it
-    // in plaintext can generate valid MFA codes for this account.
     @Convert(converter = EncryptedStringConverter.class)
     @Column
     private String mfaSecret;

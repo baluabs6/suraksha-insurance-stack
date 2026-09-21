@@ -11,15 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Analyzes a photo attached to a claim (damage photo, medical bill, repair
- * estimate, etc.) and writes a short factual description an adjuster can
- * skim instead of opening the image themselves. Deliberately descriptive
- * only — it never estimates a payout or says whether the claim looks
- * fraudulent; that stays fraud-detection-service's job, which has the actual
- * claim/policy data to reason over. This endpoint only sees the one image
- * it's given.
- */
 @RestController
 @RequestMapping("/api/ai/documents")
 @RequiredArgsConstructor
@@ -98,12 +89,6 @@ public class DocumentAnalysisController {
         return new DocumentAnalysisResponse(summary.trim(), summary.equals(fallback));
     }
 
-    /**
-     * Same input as /analyze, but returns structured fields instead of a
-     * free-text summary — the natural next step once an adjuster has read
-     * the description and wants the numbers keyed into the claim record
-     * without retyping them by hand.
-     */
     @PostMapping("/extract")
     public DocumentExtractionResponse extract(@Valid @RequestBody DocumentAnalysisRequest req) {
         String claimType = req.getClaimType() == null || req.getClaimType().isBlank()

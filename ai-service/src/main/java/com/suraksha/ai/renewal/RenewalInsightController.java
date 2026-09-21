@@ -10,13 +10,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Same shape as RecommendationController: the *factors* are computed by
- * plain rules here (never invented by the model), and the LLM only writes
- * the plain-language paragraph explaining them. Keeps the underlying claim
- * (why premiums/renewal terms look the way they do) deterministic and
- * auditable even though the wording is generated.
- */
 @RestController
 @RequestMapping("/api/ai/renewal-insight")
 @RequiredArgsConstructor

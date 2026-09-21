@@ -15,12 +15,6 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.List;
 
-/**
- * Same pattern as ai-service's InternalServiceAuthFilter: authenticates
- * backend -> fraud-detection-service calls with a shared secret header,
- * closing the previously-open /internal/claims/submitted endpoint (see the
- * comment that used to live directly on ClaimSubmittedController).
- */
 @Component
 public class InternalServiceAuthFilter extends OncePerRequestFilter {
 

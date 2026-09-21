@@ -19,8 +19,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DocumentController {
 
-    // ~6 MB of actual file content (base64 inflates size by ~33%). Demo-level
-    // guardrail only — see PolicyDocument's class comment for the real fix.
     private static final int MAX_BASE64_LENGTH = 8_000_000;
 
     private final PolicyDocumentRepository policyDocumentRepository;

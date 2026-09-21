@@ -6,14 +6,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.SecureRandom;
 
-/**
- * RFC 6238 TOTP (the algorithm behind Google Authenticator, Authy, 1Password
- * etc.) implemented directly against the JDK's HMAC primitives — no external
- * library needed, and it's ~80 lines of well-specified, easily auditable
- * code. Phishing-resistant in the sense that a stolen password alone is no
- * longer enough; the attacker also needs the physical device holding the
- * secret, which never leaves it.
- */
 @Service
 public class TotpService {
 
@@ -23,7 +15,7 @@ public class TotpService {
     private static final String BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
     public String generateSecret() {
-        byte[] bytes = new byte[20]; // 160-bit secret, standard for TOTP
+        byte[] bytes = new byte[20];
         new SecureRandom().nextBytes(bytes);
         return base32Encode(bytes);
     }
@@ -34,7 +26,6 @@ public class TotpService {
                 .formatted(label, base32Secret, issuer, CODE_DIGITS, TIME_STEP_SECONDS);
     }
 
-    /** Accepts the previous, current, and next time windows to tolerate clock drift on the user's device. */
     public boolean verifyCode(String base32Secret, String code) {
         if (code == null || !code.matches("\\d{6}")) {
             return false;

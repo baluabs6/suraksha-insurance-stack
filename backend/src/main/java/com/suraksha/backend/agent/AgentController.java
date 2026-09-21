@@ -13,13 +13,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Read-only view for an AGENT of the policies attributed to them (see
- * Policy.agent) and the claims filed against those policies — enough to
- * answer "how are my customers doing" without giving agents blanket access
- * to every policyholder's data the way an ADMIN or CLAIMS_ADJUSTER has.
- * Gated by both SecurityConfig's URL rule and @PreAuthorize here.
- */
 @RestController
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('AGENT', 'ADMIN')")

@@ -12,20 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
 
-/**
- * AES-256-GCM field-level encryption for sensitive columns (KYC identifiers,
- * MFA secrets). Ciphertext, not plaintext, is what ends up in the database —
- * so a raw DB dump, a leaked backup, or unauthorized read access to a
- * replica doesn't hand over usable PII on its own; the attacker also needs
- * this key, which should live outside the database entirely.
- *
- * IMPORTANT — app.crypto.key here is a local-dev convenience read from
- * config. In any real deployment this must come from a KMS or Vault-backed
- * secret, never a static application property, and should be rotated
- * periodically: keep the previous key available for decrypting existing
- * rows only, and re-encrypt with the current key on next write (or run a
- * background re-encryption job after rotation).
- */
 @Component
 @Converter
 public class EncryptedStringConverter implements AttributeConverter<String, String> {

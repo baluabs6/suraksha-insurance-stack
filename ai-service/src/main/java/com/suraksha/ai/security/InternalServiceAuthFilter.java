@@ -15,17 +15,6 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.List;
 
-/**
- * Authenticates service-to-service calls under /internal/** using a shared
- * secret header, since these calls (fraud-detection-service -> ai-service)
- * have no end-user JWT to present. This was previously wide open — anyone
- * who could reach ai-service could POST a fabricated claim.flagged event.
- *
- * A shared secret is a pragmatic middle ground for a demo; mTLS between
- * services (see k8s/ Istio notes in SECURITY.md) is the stronger long-term
- * answer since it authenticates at the connection level and doesn't rely on
- * a static secret that every internal caller must keep.
- */
 @Component
 public class InternalServiceAuthFilter extends OncePerRequestFilter {
 

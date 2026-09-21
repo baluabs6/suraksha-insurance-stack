@@ -5,12 +5,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
-/**
- * Single entry point for raising a notification. In-app only for this demo —
- * bolting on email/SMS later means adding a NotificationDispatcher interface
- * here (SES/SNS/Twilio/etc.) and calling it from create() alongside the DB
- * write, without touching any of the ~10 call sites across the codebase.
- */
 @Service
 @RequiredArgsConstructor
 public class NotificationService {

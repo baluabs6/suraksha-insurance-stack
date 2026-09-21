@@ -12,16 +12,6 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
-/**
- * Once a day, finds ACTIVE policies renewing within the next 30 days and
- * raises a one-time in-app reminder for each (guarded by
- * NotificationRepository.existsByUserIdAndTypeAndRelatedEntityId so a policy
- * doesn't get re-notified every day it stays inside that window).
- *
- * Runs at a fixed delay from application startup rather than a cron
- * expression tied to wall-clock time, so it also fires shortly after boot in
- * local/demo environments instead of only at 2 AM.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

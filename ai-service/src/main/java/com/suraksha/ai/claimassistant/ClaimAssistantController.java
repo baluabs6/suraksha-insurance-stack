@@ -12,14 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Lets a customer describe an incident in plain English ("my car was hit in
- * the parking lot yesterday, looks like about 15k of damage to the bumper")
- * and turns it into a draft for the existing claim form fields, instead of
- * making them map their story onto claimType/incidentDate/claimAmount
- * themselves. Purely a drafting aid — the customer still reviews and edits
- * every field, and the actual POST /api/claims call is unchanged.
- */
 @RestController
 @RequestMapping("/api/ai/claim-assistant")
 @RequiredArgsConstructor
@@ -71,7 +63,7 @@ public class ClaimAssistantController {
         String userMessage = "Customer's policies:\n" + policyList
                 + "\n\nCustomer's narrative:\n" + req.getNarrative();
 
-        String fallbackJson = "__FALLBACK__"; // sentinel, handled below rather than parsed as JSON
+        String fallbackJson = "__FALLBACK__";
         String raw = anthropicClient.complete(SYSTEM_PROMPT, userMessage, fallbackJson);
 
         if (fallbackJson.equals(raw) || !anthropicClient.isConfigured()) {

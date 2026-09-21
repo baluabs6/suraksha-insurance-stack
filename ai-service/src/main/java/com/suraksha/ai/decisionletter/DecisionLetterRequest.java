@@ -11,12 +11,8 @@ public class DecisionLetterRequest {
     @NotNull(message = "claimId is required.")
     private UUID claimId;
 
-    // The decision the adjuster already made — this endpoint drafts the
-    // letter for it, it never makes or suggests the decision itself.
     @NotBlank(message = "decision is required.")
-    private String decision; // APPROVED | REJECTED | SETTLED
+    private String decision;
 
-    // Optional internal note the adjuster wrote when changing status —
-    // used as grounding context (e.g. "missing invoice"), not quoted verbatim.
     private String internalNote;
 }

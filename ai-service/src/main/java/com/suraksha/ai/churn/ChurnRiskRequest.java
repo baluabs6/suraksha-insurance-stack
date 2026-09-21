@@ -17,7 +17,6 @@ public class ChurnRiskRequest {
     private LocalDate startDate;
     private LocalDate endDate;
 
-    // Same client-supplied-context pattern as RenewalInsightRequest.
     private int totalClaimsFiled;
     private int highRiskClaims;
     private int mediumRiskClaims;

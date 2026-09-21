@@ -10,15 +10,6 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-/**
- * Puts every /api/ai/** endpoint behind the same JWT the main backend
- * issues. Previously this service had no auth at all — anyone who could
- * reach port 8082 could call the chatbot, recommendations, document
- * analysis, claim assistant, renewal insight, and adjuster query endpoints
- * directly. CSRF is left to the main backend (this service is only ever
- * called with a bearer/cookie token, not browser-form-style state changes),
- * but every request now requires a valid, non-expired access token.
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -31,7 +22,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable()) // stateless bearer/cookie auth only, no browser session state to protect here
+            .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health/**").permitAll()

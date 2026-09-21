@@ -6,16 +6,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 
-/**
- * Progressive account lockout, independent of the IP-based RateLimitService.
- * IP-based limits stop a single script hammering the endpoint; this stops
- * credential stuffing distributed across many IPs against one account,
- * which IP-based limiting alone can't catch.
- *
- * Deliberately time-boxed (not a permanent lock): a permanent lock triggered
- * by a stranger entering a wrong password becomes its own denial-of-service
- * vector against the real account owner.
- */
 @Service
 @RequiredArgsConstructor
 public class LoginAttemptService {

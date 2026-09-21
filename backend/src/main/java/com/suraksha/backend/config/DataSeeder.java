@@ -24,9 +24,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 
-// Seeds one demo account with sample policies, a claim, and a payment so the
-// app has something to show immediately after startup. Safe to delete for a
-// real deployment — remove this class before going to production.
 @Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
@@ -52,9 +49,6 @@ public class DataSeeder implements CommandLineRunner {
                 .kycVerified(true)
                 .build());
 
-        // Staff accounts for the role-gated endpoints (adjuster claim queue,
-        // agent dashboard, admin audit log). Same demo password everywhere —
-        // change before any real deployment, same as the customer account.
         User demoAgent = userRepository.save(User.builder()
                 .fullName("Rahul Menon")
                 .email("agent@suraksha.in")

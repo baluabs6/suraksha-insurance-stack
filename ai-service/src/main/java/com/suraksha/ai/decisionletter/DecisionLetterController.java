@@ -14,13 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Drafts the customer-facing letter for a decision an adjuster already made
- * in the backend (via PATCH /api/adjuster/claims/{id}/status) — this
- * endpoint never makes or changes that decision, it only writes the letter
- * announcing it, grounded strictly in the claim's own recorded facts. The
- * adjuster is expected to review the draft before sending it.
- */
 @RestController
 @RequestMapping("/api/ai/decision-letter")
 @RequiredArgsConstructor

@@ -2,7 +2,6 @@ package com.suraksha.backend.auth.dto;
 
 import lombok.Value;
 
-/** Either a full user session (mfaRequired=false, user populated) or a challenge (mfaRequired=true, mfaToken populated). */
 @Value
 public class LoginResponse {
     boolean mfaRequired;

@@ -62,8 +62,6 @@ public class AuthController {
         String userAgent = httpRequest.getHeader("User-Agent");
         String email = req.getEmail().toLowerCase();
 
-        // IP-based limiting stops a single script; per-account lockout (below)
-        // stops credential stuffing distributed across many IPs.
         if (!rateLimitService.allow("login:ip:" + ip, 15, Duration.ofMinutes(15))) {
             return ResponseEntity.status(429).body(Map.of("message", "Too many login attempts from this network. Please try again later."));
         }
@@ -124,7 +122,7 @@ public class AuthController {
         User user = currentUser(authentication);
         String secret = totpService.generateSecret();
         user.setMfaSecret(secret);
-        user.setMfaEnabled(false); // not active until confirmed via /mfa/enable
+        user.setMfaEnabled(false);
         userRepository.save(user);
         String otpAuthUrl = totpService.buildOtpAuthUrl(secret, user.getEmail(), "Suraksha Insurance");
         return ResponseEntity.ok(new MfaSetupResponse(secret, otpAuthUrl));
@@ -149,8 +147,6 @@ public class AuthController {
     @PostMapping("/mfa/disable")
     public ResponseEntity<?> disableMfa(@Valid @RequestBody LoginRequest req, Authentication authentication,
                                          HttpServletRequest httpRequest) {
-        // Require the password again, not just an active session, before turning
-        // off a security control — otherwise a hijacked session could disable MFA.
         User user = currentUser(authentication);
         if (!passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
             return ResponseEntity.status(401).body(Map.of("message", "Incorrect password."));
@@ -176,8 +172,6 @@ public class AuthController {
         RefreshOutcome outcome = jwtService.rotateRefreshToken(refreshToken);
         switch (outcome.status()) {
             case REUSE_DETECTED -> {
-                // A token that was already rotated out came back — treat as theft,
-                // not as a race condition, and force this session to log in again.
                 auditService.record(outcome.userId(), "REFRESH_REUSE_DETECTED", ip, httpRequest.getHeader("User-Agent"), null);
                 cookieUtil.clearAuthCookies(response);
                 return ResponseEntity.status(401).body(Map.of("message", "Session invalidated — please log in again."));
@@ -214,7 +208,6 @@ public class AuthController {
         return ResponseEntity.ok(UserResponse.from(currentUser(authentication)));
     }
 
-    // ---- helpers ------------------------------------------------------
 
     private UserResponse completeLogin(User user, HttpServletRequest httpRequest, HttpServletResponse response) {
         String ip = clientIp(httpRequest);
@@ -237,7 +230,6 @@ public class AuthController {
                 .orElseThrow(() -> new IllegalStateException("Authenticated user not found: " + userId));
     }
 
-    /** Honors X-Forwarded-For (set by a trusted reverse proxy/ingress) before falling back to the raw connection address. */
     private String clientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {

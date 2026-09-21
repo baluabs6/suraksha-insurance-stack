@@ -10,14 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-/**
- * Turns a fraud-detection flag into a note an adjuster can actually act on in
- * a few seconds, instead of a bare risk score and a list of rule names.
- *
- * Previously invoked from a @KafkaListener on the claim.flagged topic; now
- * invoked directly by ClaimFlaggedController, which fraud-detection-service
- * calls over HTTP. The logic below is unchanged from the Kafka version.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j

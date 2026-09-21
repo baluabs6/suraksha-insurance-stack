@@ -12,14 +12,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-// Originally published to Kafka's "claim.flagged" topic and consumed by
-// ai-service. Rewritten as a direct internal HTTP call — see the note in
-// backend's ClaimEventPublisher for why. Fire-and-forget for the same
-// reason: a flagged claim is already saved with its risk score by the time
-// this fires, so a slow/unreachable ai-service should never fail the
-// caller's request — it just means the AI triage note doesn't get written
-// yet, which is recoverable (a backfill job could re-check unflagged claims
-// with no aiSummary).
 @Component
 @Slf4j
 public class AiServiceClient {
@@ -32,13 +24,9 @@ public class AiServiceClient {
     @Value("${ai.service.base-url}")
     private String aiServiceBaseUrl;
 
-    // Must match ai-service's app.internal-service-token — authenticates this
-    // service-to-service call now that /internal/** requires it.
     @Value("${app.internal-service-token}")
     private String internalServiceToken;
 
-    // Same normalization as backend's ClaimEventPublisher — Render's private
-    // fromService/hostport value has no scheme.
     private String resolvedBaseUrl() {
         return aiServiceBaseUrl.contains("://") ? aiServiceBaseUrl : "http://" + aiServiceBaseUrl;
     }

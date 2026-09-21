@@ -9,13 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 
-/**
- * Verifies the X-Razorpay-Signature header: HMAC-SHA256 of the raw request
- * body, keyed with the webhook secret, hex-encoded. This is why the webhook
- * controller reads the body as a raw string instead of letting Spring bind
- * it to a DTO first — signature verification needs the exact bytes Razorpay
- * signed, before any JSON parsing/re-serialization could change them.
- */
 @Component
 public class WebhookSignatureVerifier {
 
@@ -35,8 +28,6 @@ public class WebhookSignatureVerifier {
             mac.init(new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             byte[] computed = mac.doFinal(rawBody.getBytes(StandardCharsets.UTF_8));
             String computedHex = HexFormat.of().formatHex(computed);
-            // Constant-time comparison — a timing side-channel on signature
-            // comparison is a real (if narrow) attack surface on webhooks.
             return MessageDigest.isEqual(
                     computedHex.getBytes(StandardCharsets.UTF_8),
                     signatureHeader.getBytes(StandardCharsets.UTF_8)

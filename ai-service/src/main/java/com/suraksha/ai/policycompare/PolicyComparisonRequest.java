@@ -11,7 +11,5 @@ public class PolicyComparisonRequest {
     @NotBlank(message = "Describe your situation.")
     private String situation;
 
-    // Types the customer already owns — excluded from the comparison, same
-    // convention as RecommendationRequest.
     private List<PolicyTypeView> ownedTypes;
 }
