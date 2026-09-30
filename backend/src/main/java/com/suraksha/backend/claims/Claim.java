@@ -2,6 +2,7 @@ package com.suraksha.backend.claims;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.suraksha.backend.policy.Policy;
+import com.suraksha.backend.security.EncryptedStringConverter;
 import com.suraksha.backend.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -65,6 +66,36 @@ public class Claim {
 
     @Column(length = 2000)
     private String decisionNotes;
+
+    // ---- Health claims ----
+    private UUID memberId;
+
+    private String hospitalName;
+
+    private LocalDate admissionDate;
+
+    private LocalDate dischargeDate;
+
+    /** Health data: encrypted at rest. */
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(length = 2000)
+    private String diagnosis;
+
+    private String treatingDoctor;
+
+    private Boolean accidental;
+
+    private BigDecimal roomCharges;
+    private BigDecimal procedureCharges;
+    private BigDecimal medicineCharges;
+    private BigDecimal diagnosticCharges;
+    private BigDecimal otherCharges;
+
+    /** Estimated payable after deductions (see HealthClaimAssessor). Advisory; the adjuster decides. */
+    private BigDecimal eligibleAmount;
+
+    @Column(length = 2000)
+    private String assessmentNotes;
 
     @Column(name = "status_updated_by")
     private UUID statusUpdatedBy;

@@ -2,6 +2,8 @@ package com.suraksha.backend.claims.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
@@ -23,4 +25,28 @@ public class ClaimRequest {
 
     @NotBlank(message = "Give a short description of what happened.")
     private String description;
+
+    // ---- Health-policy claims only (ignored for other policy types) ----
+    private UUID memberId;
+
+    @Size(max = 200)
+    private String hospitalName;
+
+    private LocalDate admissionDate;
+
+    private LocalDate dischargeDate;
+
+    @Size(max = 300)
+    private String diagnosis;
+
+    @Size(max = 120)
+    private String treatingDoctor;
+
+    private Boolean accidental;
+
+    @PositiveOrZero private BigDecimal roomCharges;
+    @PositiveOrZero private BigDecimal procedureCharges;
+    @PositiveOrZero private BigDecimal medicineCharges;
+    @PositiveOrZero private BigDecimal diagnosticCharges;
+    @PositiveOrZero private BigDecimal otherCharges;
 }

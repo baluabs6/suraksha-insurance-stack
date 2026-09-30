@@ -57,3 +57,21 @@ service token, separate from customer-facing JWTs. In Kubernetes, a
 deny-by-default NetworkPolicy set restricts traffic to only the paths each
 service actually needs, and an Ingress with TLS fronts the public-facing
 services.
+
+## Health insurance features
+
+Health policies have extra behaviour on top of the generic policy/claim flow:
+
+- **Insured members** (`/api/policies/{id}/members`): people covered under a health policy (up to 6, one "self").
+  Declared pre-existing conditions are encrypted at rest with the same converter as PAN/Aadhaar.
+- **Coverage tracker** (`/api/policies/{id}/coverage`): sum insured, used (approved/settled), reserved by
+  pending claims, remaining, plus the plan terms (room-rent cap, co-pay, waiting periods).
+- **Health claims** (`POST /api/claims` on a HEALTH policy): member, hospital, admission/discharge dates,
+  diagnosis (encrypted), doctor, accident flag and an itemised bill whose total must equal the claim amount.
+- **Deterministic assessment** (`HealthClaimAssessor`): room-rent proportionate deduction, co-pay, cap at
+  remaining sum insured, and waiting-period review notes. It produces an *estimate* and notes for the adjuster;
+  it never approves or rejects a claim. Read its class comment for the assumptions to confirm with your
+  product/compliance team.
+- New plan-term columns on `policies` (`room_rent_cap_per_day`, `co_pay_percent`, `initial_waiting_days`,
+  `pre_existing_waiting_months`) are nullable; null means no cap / 0% / 30 days / 24 months.
+- Adjuster reads of a claim that has health details are written to the audit log (`HEALTH_CLAIM_VIEWED`).

@@ -53,6 +53,19 @@ public class Policy {
     @Column(nullable = false)
     private LocalDate endDate;
 
+    // ---- Health plan terms (nullable: null means "no limit" / the default) ----
+    /** Maximum room rent per day covered; null = no cap. */
+    private BigDecimal roomRentCapPerDay;
+
+    /** Percentage of each admissible claim the customer pays; null = 0. */
+    private Integer coPayPercent;
+
+    /** Days at the start of the policy with no cover for illness; null = 30. */
+    private Integer initialWaitingDays;
+
+    /** Months before declared pre-existing conditions are covered; null = 24. */
+    private Integer preExistingWaitingMonths;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

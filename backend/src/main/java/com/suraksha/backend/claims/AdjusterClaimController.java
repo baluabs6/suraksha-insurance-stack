@@ -38,9 +38,15 @@ public class AdjusterClaimController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> get(@PathVariable UUID id) {
+    public ResponseEntity<?> get(@PathVariable UUID id, Authentication auth) {
         return claimRepository.findById(id)
-                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .<ResponseEntity<?>>map(c -> {
+                    if (c.getDiagnosis() != null) {
+                        auditService.record(UUID.fromString(auth.getName()), "HEALTH_CLAIM_VIEWED", null, null,
+                                "claimId=" + c.getId());
+                    }
+                    return ResponseEntity.ok(c);
+                })
                 .orElse(ResponseEntity.status(404).body(Map.of("message", "Claim not found.")));
     }
 

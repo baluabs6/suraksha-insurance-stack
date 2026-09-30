@@ -6,6 +6,9 @@ import {
 import api from "./api/client.js";
 import aiApi from "./api/aiClient.js";
 import ChatWidget from "./ChatWidget.jsx";
+import HealthPolicyPanel from "./health/HealthPolicyPanel.jsx";
+import HealthClaimFields from "./health/HealthClaimFields.jsx";
+import { EMPTY_HEALTH_CLAIM, BILL_FIELDS, billTotal } from "./health/format.js";
 
 const planIcon = (type) => (type === "HEALTH" ? HeartPulse : type === "MOTOR" ? Car : Umbrella);
 
@@ -286,6 +289,7 @@ function Policies({ policies }) {
                 <div className="flex justify-between"><span>Premium</span><span className="text-[#16303F]">{inr(p.premium)}/yr</span></div>
                 <div className="flex justify-between"><span>Ends</span><span className="text-[#16303F]">{p.endDate}</span></div>
               </div>
+              {p.type === "HEALTH" && <HealthPolicyPanel policy={p} />}
             </div>
           );
         })}
@@ -320,22 +324,51 @@ function FileClaim({ policies, onFiled }) {
   const [errors, setErrors] = useState({});
   const [confirmed, setConfirmed] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [health, setHealth] = useState(EMPTY_HEALTH_CLAIM);
+
+  const isHealth = policies.find((p) => p.id === policyId)?.type === "HEALTH";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = {};
     if (!policyId) errs.policyId = "Select which policy this claim is against.";
-    if (!amount || Number(amount) <= 0) errs.amount = "Enter the amount you're claiming.";
-    if (!incidentDate) errs.incidentDate = "Enter when the incident happened.";
-    if (!description.trim()) errs.description = "Give a short description of what happened.";
+    if (isHealth) {
+      if (!health.memberId) errs.memberId = "Select which insured member was treated.";
+      if (!health.hospitalName.trim()) errs.hospitalName = "Enter the hospital name.";
+      if (!health.admissionDate) errs.admissionDate = "Enter the admission date.";
+      if (!health.dischargeDate) errs.dischargeDate = "Enter the discharge date.";
+      if (health.admissionDate && health.dischargeDate && health.dischargeDate < health.admissionDate) {
+        errs.dischargeDate = "Discharge can't be before admission.";
+      }
+      if (!health.diagnosis.trim()) errs.diagnosis = "Enter the diagnosis or reason for admission.";
+      if (billTotal(health) <= 0) errs.amount = "Enter at least one bill amount.";
+    } else {
+      if (!amount || Number(amount) <= 0) errs.amount = "Enter the amount you're claiming.";
+      if (!incidentDate) errs.incidentDate = "Enter when the incident happened.";
+      if (!description.trim()) errs.description = "Give a short description of what happened.";
+    }
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
     setSubmitting(true);
     try {
-      const { data: claim } = await api.post("/api/claims", {
-        policyId, claimAmount: Number(amount), incidentDate, description,
-      });
+      const payload = isHealth
+        ? {
+            policyId,
+            claimAmount: billTotal(health),
+            incidentDate: health.admissionDate,
+            description: `Hospitalisation at ${health.hospitalName.trim()} for ${health.diagnosis.trim()}`,
+            memberId: health.memberId,
+            hospitalName: health.hospitalName.trim(),
+            admissionDate: health.admissionDate,
+            dischargeDate: health.dischargeDate,
+            diagnosis: health.diagnosis.trim(),
+            treatingDoctor: health.treatingDoctor.trim() || null,
+            accidental: health.accidental,
+            ...Object.fromEntries(BILL_FIELDS.map(([key]) => [key, health[key] === "" ? null : Number(health[key])])),
+          }
+        : { policyId, claimAmount: Number(amount), incidentDate, description };
+      const { data: claim } = await api.post("/api/claims", payload);
       setConfirmed(claim);
       onFiled(claim);
     } catch (err) {
@@ -354,7 +387,21 @@ function FileClaim({ policies, onFiled }) {
           <p className="text-sm text-[#4B5563] mt-2">
             Reference <span className="text-[#16303F]">{confirmed.id?.slice(0, 8).toUpperCase()}</span>. We'll notify you once it's reviewed.
           </p>
-          <button onClick={() => { setConfirmed(null); setPolicyId(""); setAmount(""); setIncidentDate(""); setDescription(""); }}
+          {confirmed.eligibleAmount != null && (
+            <div className="mt-5 text-left bg-[#FAF9F5] border border-[#E4E1D8] rounded p-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-[#4B5563]">Estimated payable</span>
+                <span className="text-[#16303F] font-medium">₹{Number(confirmed.eligibleAmount).toLocaleString("en-IN")}</span>
+              </div>
+              {confirmed.assessmentNotes && (
+                <ul className="mt-3 space-y-1 text-xs text-[#4B5563] list-disc pl-4">
+                  {confirmed.assessmentNotes.split("\n").map((line, i) => <li key={i}>{line}</li>)}
+                </ul>
+              )}
+              <p className="mt-3 text-xs text-[#4B5563]">This is an estimate from your plan terms. The final amount is decided after an adjuster reviews your claim.</p>
+            </div>
+          )}
+          <button onClick={() => { setConfirmed(null); setPolicyId(""); setAmount(""); setIncidentDate(""); setDescription(""); setHealth(EMPTY_HEALTH_CLAIM); }}
             className="mt-6 text-sm px-4 py-2 rounded border border-[#16303F] text-[#16303F]">
             File another claim
           </button>
@@ -377,6 +424,10 @@ function FileClaim({ policies, onFiled }) {
           </select>
           {errors.policyId && <p className="text-xs text-[#B0463D] mt-1">{errors.policyId}</p>}
         </div>
+        {isHealth ? (
+          <HealthClaimFields policyId={policyId} values={health} onChange={setHealth} errors={errors} />
+        ) : (
+          <>
         <div>
           <label className="text-sm text-[#16303F] block mb-1">Amount you're claiming (₹)</label>
           <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
@@ -395,6 +446,8 @@ function FileClaim({ policies, onFiled }) {
             className="w-full border border-[#E4E1D8] rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#16303F]" placeholder="Briefly describe the incident" />
           {errors.description && <p className="text-xs text-[#B0463D] mt-1">{errors.description}</p>}
         </div>
+          </>
+        )}
         {errors.form && (
           <div className="flex items-center gap-2 text-sm text-[#B0463D]"><AlertCircle className="w-4 h-4" /> {errors.form}</div>
         )}

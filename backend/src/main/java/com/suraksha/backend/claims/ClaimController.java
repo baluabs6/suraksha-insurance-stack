@@ -2,9 +2,15 @@ package com.suraksha.backend.claims;
 
 import com.suraksha.backend.claims.dto.ClaimRequest;
 import com.suraksha.backend.claims.events.ClaimEventPublisher;
+import com.suraksha.backend.health.CoverageService;
+import com.suraksha.backend.health.HealthClaimAssessor;
+import com.suraksha.backend.health.HealthClaimValidator;
+import com.suraksha.backend.health.PolicyMember;
+import com.suraksha.backend.health.PolicyMemberRepository;
 import com.suraksha.backend.policy.Policy;
 import com.suraksha.backend.policy.PolicyRepository;
 import com.suraksha.backend.policy.PolicyStatus;
+import com.suraksha.backend.policy.PolicyType;
 import com.suraksha.backend.user.User;
 import com.suraksha.backend.user.UserRepository;
 import jakarta.validation.Valid;
@@ -13,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -29,6 +36,8 @@ public class ClaimController {
     private final UserRepository userRepository;
     private final ClaimEventPublisher claimEventPublisher;
     private final ClaimStatusHistoryRepository claimStatusHistoryRepository;
+    private final PolicyMemberRepository policyMemberRepository;
+    private final CoverageService coverageService;
 
     @GetMapping
     public List<Claim> myClaims(Authentication auth) {
@@ -47,17 +56,48 @@ public class ClaimController {
         }
 
         LocalDate today = LocalDate.now();
+        boolean health = policy.getType() == PolicyType.HEALTH;
+        // For a health claim the "incident" is the hospital admission.
+        LocalDate incidentDate = health && req.getAdmissionDate() != null ? req.getAdmissionDate() : req.getIncidentDate();
+
         if (policy.getStatus() != PolicyStatus.ACTIVE) {
             return ResponseEntity.badRequest().body(Map.of("message", "This policy is not active, so a claim can't be filed against it."));
         }
-        if (req.getIncidentDate().isAfter(today)) {
+        if (incidentDate.isAfter(today)) {
             return ResponseEntity.badRequest().body(Map.of("message", "The incident date can't be in the future."));
         }
-        if (req.getIncidentDate().isBefore(policy.getStartDate()) || req.getIncidentDate().isAfter(policy.getEndDate())) {
+        if (incidentDate.isBefore(policy.getStartDate()) || incidentDate.isAfter(policy.getEndDate())) {
             return ResponseEntity.badRequest().body(Map.of("message", "The incident date falls outside this policy's coverage period."));
         }
         if (req.getClaimAmount().compareTo(policy.getCoverageAmount()) > 0) {
             return ResponseEntity.badRequest().body(Map.of("message", "The claim amount is more than this policy's coverage."));
+        }
+
+        BigDecimal eligibleAmount = null;
+        String assessmentNotes = null;
+        PolicyMember member = null;
+        if (health) {
+            String error = HealthClaimValidator.validate(req, policy, today);
+            if (error != null) {
+                return ResponseEntity.badRequest().body(Map.of("message", error));
+            }
+            member = policyMemberRepository.findByIdAndPolicyId(req.getMemberId(), policy.getId()).orElse(null);
+            if (member == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "The selected member isn't insured under this policy."));
+            }
+            var coverage = coverageService.summarize(policy);
+            if (coverage.remaining().signum() <= 0) {
+                return ResponseEntity.badRequest().body(Map.of("message", "The sum insured on this policy has been fully used or reserved by other claims."));
+            }
+            HealthClaimAssessor.Result assessment = HealthClaimAssessor.assess(new HealthClaimAssessor.Input(
+                    new HealthClaimAssessor.Bill(req.getRoomCharges(), req.getProcedureCharges(), req.getMedicineCharges(),
+                            req.getDiagnosticCharges(), req.getOtherCharges()),
+                    req.getAdmissionDate(), req.getDischargeDate(), Boolean.TRUE.equals(req.getAccidental()),
+                    req.getDiagnosis(), member.getPreExistingConditions(), policy.getStartDate(),
+                    coverage.roomRentCapPerDay(), coverage.coPayPercent(), coverage.initialWaitingDays(),
+                    coverage.preExistingWaitingMonths(), coverage.remaining()));
+            eligibleAmount = assessment.eligibleAmount();
+            assessmentNotes = assessment.toNotes();
         }
 
         User user = userRepository.findById(userId).orElseThrow();
@@ -67,11 +107,27 @@ public class ClaimController {
                 .user(user)
                 .claimType(policy.getType().name())
                 .claimAmount(req.getClaimAmount())
-                .incidentDate(req.getIncidentDate())
+                .incidentDate(incidentDate)
                 .description(req.getDescription())
                 .status(ClaimStatus.SUBMITTED)
                 .submittedAt(Instant.now())
                 .build();
+        if (health) {
+            claim.setMemberId(member.getId());
+            claim.setHospitalName(req.getHospitalName().trim());
+            claim.setAdmissionDate(req.getAdmissionDate());
+            claim.setDischargeDate(req.getDischargeDate());
+            claim.setDiagnosis(req.getDiagnosis().trim());
+            claim.setTreatingDoctor(req.getTreatingDoctor());
+            claim.setAccidental(Boolean.TRUE.equals(req.getAccidental()));
+            claim.setRoomCharges(req.getRoomCharges());
+            claim.setProcedureCharges(req.getProcedureCharges());
+            claim.setMedicineCharges(req.getMedicineCharges());
+            claim.setDiagnosticCharges(req.getDiagnosticCharges());
+            claim.setOtherCharges(req.getOtherCharges());
+            claim.setEligibleAmount(eligibleAmount);
+            claim.setAssessmentNotes(assessmentNotes);
+        }
 
         claimRepository.save(claim);
         claimStatusHistoryRepository.save(ClaimStatusHistory.builder()

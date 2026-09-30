@@ -5,6 +5,9 @@ import com.suraksha.backend.claims.ClaimRepository;
 import com.suraksha.backend.claims.ClaimStatus;
 import com.suraksha.backend.claims.ClaimStatusHistory;
 import com.suraksha.backend.claims.ClaimStatusHistoryRepository;
+import com.suraksha.backend.health.MemberRelationship;
+import com.suraksha.backend.health.PolicyMember;
+import com.suraksha.backend.health.PolicyMemberRepository;
 import com.suraksha.backend.payment.Payment;
 import com.suraksha.backend.payment.PaymentRepository;
 import com.suraksha.backend.payment.PaymentStatus;
@@ -33,6 +36,7 @@ public class DataSeeder implements CommandLineRunner {
     private final ClaimRepository claimRepository;
     private final ClaimStatusHistoryRepository claimStatusHistoryRepository;
     private final PaymentRepository paymentRepository;
+    private final PolicyMemberRepository policyMemberRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -77,7 +81,14 @@ public class DataSeeder implements CommandLineRunner {
                 .user(demoUser).agent(demoAgent).policyNumber("POL-HL-2201394").planName("CarePlus Family")
                 .type(PolicyType.HEALTH).coverageAmount(new BigDecimal("1000000")).premium(new BigDecimal("18500"))
                 .startDate(LocalDate.of(2026, 1, 4)).endDate(LocalDate.of(2027, 1, 3))
+                .roomRentCapPerDay(new BigDecimal("5000")).coPayPercent(10)
                 .status(PolicyStatus.ACTIVE).build());
+
+        policyMemberRepository.save(PolicyMember.builder().policy(health).fullName("Ananya Rao")
+                .dateOfBirth(LocalDate.of(1992, 5, 14)).relationship(MemberRelationship.SELF).build());
+        policyMemberRepository.save(PolicyMember.builder().policy(health).fullName("Karthik Rao")
+                .dateOfBirth(LocalDate.of(1990, 11, 2)).relationship(MemberRelationship.SPOUSE)
+                .preExistingConditions("Hypertension").build());
 
         Policy motor = policyRepository.save(Policy.builder()
                 .user(demoUser).agent(demoAgent).policyNumber("POL-MT-4590213").planName("DriveSecure Comprehensive")
