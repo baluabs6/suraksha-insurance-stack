@@ -1,18 +1,30 @@
 import React, { useState } from "react";
-import { MessageCircle, X, Send, Sparkles } from "lucide-react";
-import aiApi from "./api/aiClient.js";
+import { MessageCircle, X, Send, Sparkles, RotateCcw } from "lucide-react";
+import aiApi, { clearChatConversation } from "./api/aiClient.js";
 
-export default function ChatWidget({ policies }) {
+const GREETING = { role: "assistant", text: "Hi! Ask me anything about how your policies, claims, or payments work." };
+
+// One id per conversation. The server keeps the history (Spring AI chat memory, per signed-in user),
+// so the browser only has to send this id plus the new message.
+const newConversationId = () =>
+  (typeof crypto !== "undefined" && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+
+export default function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { role: "assistant", text: "Hi! Ask me anything about how your policies, claims, or payments work." },
-  ]);
+  const [conversationId, setConversationId] = useState(newConversationId);
+  const [messages, setMessages] = useState([GREETING]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
 
-  const policySummaries = policies.map(
-    (p) => `${p.planName} (${p.type}), coverage ₹${Number(p.coverageAmount).toLocaleString("en-IN")}`
-  );
+  // Start over: forget the stored history on the server, then begin a fresh conversation.
+  const newChat = async () => {
+    const old = conversationId;
+    setConversationId(newConversationId());
+    setMessages([GREETING]);
+    try { await clearChatConversation(old); } catch { /* best effort */ }
+  };
 
   const send = async (e) => {
     e.preventDefault();
@@ -22,7 +34,7 @@ export default function ChatWidget({ policies }) {
     setInput("");
     setSending(true);
     try {
-      const { data } = await aiApi.post("/api/ai/chat", { message: text, policySummaries });
+      const { data } = await aiApi.post("/api/ai/chat", { message: text, conversationId });
       setMessages((m) => [...m, { role: "assistant", text: data.reply }]);
     } catch {
       setMessages((m) => [...m, { role: "assistant", text: "Sorry, I couldn't reach the assistant right now." }]);
@@ -49,7 +61,10 @@ export default function ChatWidget({ policies }) {
         <div className="flex items-center gap-2 text-sm text-[#16303F]">
           <Sparkles className="w-4 h-4 text-[#B8863C]" /> Suraksha assistant
         </div>
-        <button onClick={() => setOpen(false)}><X className="w-4 h-4 text-[#4B5563]" /></button>
+        <div className="flex items-center gap-3">
+          <button onClick={newChat} aria-label="Start a new chat" title="New chat"><RotateCcw className="w-4 h-4 text-[#4B5563]" /></button>
+          <button onClick={() => setOpen(false)} aria-label="Close chat"><X className="w-4 h-4 text-[#4B5563]" /></button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {messages.map((m, i) => (

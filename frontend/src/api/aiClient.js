@@ -36,3 +36,8 @@ export function askAdjuster({ question, policyId, riskLevel }) {
     .post("/api/ai/adjuster/query", { question, policyId, riskLevel })
     .then((res) => res.data);
 }
+
+// Forget the server-side history for one support-chat conversation ("New chat").
+export function clearChatConversation(conversationId) {
+  return aiApi.delete(`/api/ai/chat/${encodeURIComponent(conversationId)}`);
+}

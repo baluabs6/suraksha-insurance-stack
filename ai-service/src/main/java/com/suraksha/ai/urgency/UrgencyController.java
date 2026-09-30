@@ -1,12 +1,9 @@
 package com.suraksha.ai.urgency;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.suraksha.ai.client.AnthropicClient;
 import com.suraksha.ai.security.PromptGuard;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Set;
@@ -14,7 +11,6 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/ai/urgency")
 @RequiredArgsConstructor
-@Slf4j
 public class UrgencyController {
 
     private static final Set<String> VALID_LEVELS = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
@@ -25,12 +21,6 @@ public class UrgencyController {
             or customer message is, purely for routing to a human queue faster
             or slower. This is not a medical, legal, or safety judgment — you
             are labeling text, not assessing a person.
-
-            Respond with ONLY a single JSON object, no markdown fences:
-            {
-              "urgencyLevel": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
-              "reason": "<one short factual sentence citing what in the text drove this>"
-            }
 
             Guide (not exhaustive):
             - LOW: routine, already-resolved, or informational (e.g. minor
@@ -55,7 +45,6 @@ public class UrgencyController {
             """;
 
     private final AnthropicClient anthropicClient;
-    private final ObjectMapper mapper = new ObjectMapper();
 
     @PostMapping
     public UrgencyResponse classify(@Valid @RequestBody UrgencyRequest req) {
@@ -65,33 +54,18 @@ public class UrgencyController {
         String userMessage = "Claim type: " + claimType + "\n\nText to classify:\n"
                 + PromptGuard.wrapUntrusted(req.getText());
 
-        String fallbackSentinel = "__FALLBACK__";
-        String raw = anthropicClient.complete(SYSTEM_PROMPT, userMessage, fallbackSentinel);
-
-        if (fallbackSentinel.equals(raw) || !anthropicClient.isConfigured()) {
-            return new UrgencyResponse("MEDIUM",
-                    "AI urgency triage unavailable (ANTHROPIC_API_KEY not configured) — defaulted to MEDIUM.", true);
-        }
-
-        try {
-            JsonNode node = mapper.readTree(stripCodeFences(raw));
-            String level = node.path("urgencyLevel").asText("MEDIUM").toUpperCase();
-            if (!VALID_LEVELS.contains(level)) {
-                level = "MEDIUM";
-            }
-            String reason = node.path("reason").asText("No specific reason returned.");
-            return new UrgencyResponse(level, reason, false);
-        } catch (Exception e) {
-            log.warn("Could not parse urgency JSON response, defaulting to MEDIUM.", e);
-            return new UrgencyResponse("MEDIUM", "Couldn't parse the classifier's response — defaulted to MEDIUM.", true);
-        }
-    }
-
-    private static String stripCodeFences(String s) {
-        String t = s.trim();
-        if (t.startsWith("```")) {
-            t = t.replaceFirst("^```[a-zA-Z]*\\n", "").replaceFirst("```\\s*$", "");
-        }
-        return t.trim();
+        return anthropicClient.completeStructured(SYSTEM_PROMPT, userMessage, UrgencyAssessment.class)
+                .map(a -> {
+                    String level = a.urgencyLevel() == null ? "MEDIUM" : a.urgencyLevel().trim().toUpperCase();
+                    if (!VALID_LEVELS.contains(level)) {
+                        level = "MEDIUM";
+                    }
+                    String reason = a.reason() == null || a.reason().isBlank()
+                            ? "No specific reason returned." : a.reason();
+                    return new UrgencyResponse(level, reason, false);
+                })
+                .orElseGet(() -> new UrgencyResponse("MEDIUM",
+                        "AI urgency triage unavailable (ANTHROPIC_API_KEY not configured or the reply couldn't be read) — defaulted to MEDIUM.",
+                        true));
     }
 }

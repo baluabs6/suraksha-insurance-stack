@@ -1,67 +1,80 @@
 package com.suraksha.ai.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.suraksha.ai.advisor.UsageLoggingAdvisor;
+import com.suraksha.ai.security.PiiRedactor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MimeType;
+import org.springframework.util.MimeTypeUtils;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
+import java.util.Base64;
+import java.util.List;
+import java.util.Optional;
 
+/**
+ * Facade over Spring AI's {@link ChatClient}. Every AI feature in this service goes through
+ * here, which keeps three cross-cutting behaviours in one place:
+ *
+ *  - the "no API key -> canned, clearly-labelled fallback" contract the whole stack relies on,
+ *  - PII redaction of anything sent as user content, and
+ *  - prompts built as Message objects (not templates), so customer text containing
+ *    "{" or "}" is never interpreted as a Spring AI prompt placeholder.
+ *
+ * The public method signatures are unchanged from the previous hand-rolled HTTP client, so the
+ * existing controllers keep working; new code can use {@link #chatClient()} directly.
+ */
 @Component
 @Slf4j
 public class AnthropicClient {
 
-    private static final String API_URL = "https://api.anthropic.com/v1/messages";
-    private static final String API_VERSION = "2023-06-01";
+    private static final int TEXT_MAX_TOKENS = 500;
+    private static final int IMAGE_MAX_TOKENS = 700;
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ChatClient chatClient;
+    private final String apiKey;
 
-    @Value("${anthropic.api-key}")
-    private String apiKey;
-
-    @Value("${anthropic.model}")
-    private String model;
+    public AnthropicClient(ChatClient.Builder builder,
+                           UsageLoggingAdvisor usageLoggingAdvisor,
+                           @Value("${anthropic.api-key:}") String apiKey) {
+        this.chatClient = builder.defaultAdvisors(usageLoggingAdvisor).build();
+        this.apiKey = apiKey;
+    }
 
     public boolean isConfigured() {
         return apiKey != null && !apiKey.isBlank();
     }
 
+    /** The shared ChatClient, for features that need memory, tools or other advisors. */
+    public ChatClient chatClient() {
+        return chatClient;
+    }
+
     public String complete(String systemPrompt, String userMessage, String fallback) {
         if (!isConfigured()) {
-            log.warn("ANTHROPIC_API_KEY not set — returning fallback response instead of calling the API.");
+            log.warn("ANTHROPIC_API_KEY not set — returning fallback response instead of calling the model.");
             return fallback;
         }
         try {
-            ObjectNode body = mapper.createObjectNode();
-            body.put("model", model);
-            body.put("max_tokens", 500);
-            body.put("system", systemPrompt);
-            ArrayNode messages = body.putArray("messages");
-            ObjectNode userMsg = messages.addObject();
-            userMsg.put("role", "user");
-            userMsg.put("content", userMessage);
-
-            return send(body, fallback);
+            String text = chatClient.prompt(textPrompt(systemPrompt, userMessage)).call().content();
+            return text == null || text.isBlank() ? fallback : text;
         } catch (Exception e) {
-            log.error("Anthropic API call failed, using fallback response.", e);
+            log.error("Model call failed, using fallback response.", e);
             return fallback;
         }
     }
 
     public String completeWithImage(String systemPrompt, String userMessage,
-                                     String base64Image, String mediaType, String fallback) {
+                                    String base64Image, String mediaType, String fallback) {
         if (!isConfigured()) {
-            log.warn("ANTHROPIC_API_KEY not set — returning fallback response instead of calling the API.");
+            log.warn("ANTHROPIC_API_KEY not set — returning fallback response instead of calling the model.");
             return fallback;
         }
         if (base64Image == null || base64Image.isBlank()) {
@@ -69,60 +82,64 @@ public class AnthropicClient {
             return fallback;
         }
         try {
-            ObjectNode body = mapper.createObjectNode();
-            body.put("model", model);
-            body.put("max_tokens", 700);
-            body.put("system", systemPrompt);
-            ArrayNode messages = body.putArray("messages");
-            ObjectNode userMsg = messages.addObject();
-            userMsg.put("role", "user");
-            ArrayNode contentBlocks = userMsg.putArray("content");
-
-            ObjectNode imageBlock = contentBlocks.addObject();
-            imageBlock.put("type", "image");
-            ObjectNode source = imageBlock.putObject("source");
-            source.put("type", "base64");
-            source.put("media_type", mediaType != null && !mediaType.isBlank() ? mediaType : "image/jpeg");
-            source.put("data", base64Image);
-
-            ObjectNode textBlock = contentBlocks.addObject();
-            textBlock.put("type", "text");
-            textBlock.put("text", userMessage);
-
-            return send(body, fallback);
+            String text = chatClient.prompt(imagePrompt(systemPrompt, userMessage, base64Image, mediaType))
+                    .call().content();
+            return text == null || text.isBlank() ? fallback : text;
         } catch (Exception e) {
-            log.error("Anthropic API call failed, using fallback response.", e);
+            log.error("Model call failed, using fallback response.", e);
             return fallback;
         }
     }
 
-    private String send(ObjectNode body, String fallback) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(API_URL))
-                .header("Content-Type", "application/json")
-                .header("x-api-key", apiKey)
-                .header("anthropic-version", API_VERSION)
-                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
-                .timeout(Duration.ofSeconds(30))
+    /**
+     * Structured output: Spring AI appends the JSON schema for {@code type} to the prompt and
+     * maps the reply onto it. Returns empty when the key is missing, the call fails, or the
+     * reply doesn't fit the type — callers decide what their fallback looks like.
+     */
+    public <T> Optional<T> completeStructured(String systemPrompt, String userMessage, Class<T> type) {
+        if (!isConfigured()) {
+            log.warn("ANTHROPIC_API_KEY not set — skipping structured model call.");
+            return Optional.empty();
+        }
+        try {
+            return Optional.ofNullable(chatClient.prompt(textPrompt(systemPrompt, userMessage)).call().entity(type));
+        } catch (Exception e) {
+            log.warn("Structured model call failed or returned an unparseable reply.", e);
+            return Optional.empty();
+        }
+    }
+
+    public <T> Optional<T> completeStructuredWithImage(String systemPrompt, String userMessage,
+                                                       String base64Image, String mediaType, Class<T> type) {
+        if (!isConfigured() || base64Image == null || base64Image.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.ofNullable(
+                    chatClient.prompt(imagePrompt(systemPrompt, userMessage, base64Image, mediaType))
+                            .call().entity(type));
+        } catch (Exception e) {
+            log.warn("Structured image call failed or returned an unparseable reply.", e);
+            return Optional.empty();
+        }
+    }
+
+    private static Prompt textPrompt(String systemPrompt, String userMessage) {
+        return new Prompt(
+                List.of(new SystemMessage(systemPrompt), new UserMessage(PiiRedactor.redact(userMessage))),
+                ChatOptions.builder().maxTokens(TEXT_MAX_TOKENS).build());
+    }
+
+    private static Prompt imagePrompt(String systemPrompt, String userMessage, String base64Image, String mediaType) {
+        byte[] bytes = Base64.getMimeDecoder().decode(base64Image.trim());
+        MimeType mime = MimeTypeUtils.parseMimeType(
+                mediaType != null && !mediaType.isBlank() ? mediaType : "image/jpeg");
+        UserMessage user = UserMessage.builder()
+                .text(PiiRedactor.redact(userMessage))
+                .media(List.of(new Media(mime, new ByteArrayResource(bytes))))
                 .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-        if (response.statusCode() != 200) {
-            log.error("Anthropic API returned {}: {}", response.statusCode(), response.body());
-            return fallback;
-        }
-
-        JsonNode root = mapper.readTree(response.body());
-        JsonNode content = root.path("content");
-        StringBuilder text = new StringBuilder();
-        if (content.isArray()) {
-            for (JsonNode block : content) {
-                if ("text".equals(block.path("type").asText())) {
-                    text.append(block.path("text").asText());
-                }
-            }
-        }
-        return text.length() > 0 ? text.toString() : fallback;
+        return new Prompt(
+                List.of(new SystemMessage(systemPrompt), user),
+                ChatOptions.builder().maxTokens(IMAGE_MAX_TOKENS).build());
     }
 }

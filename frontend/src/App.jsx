@@ -623,7 +623,7 @@ export default function App() {
           {active === "profile" && <Profile user={user} />}
         </div>
       </div>
-      <ChatWidget policies={policies} />
+      <ChatWidget />
     </div>
   );
 }

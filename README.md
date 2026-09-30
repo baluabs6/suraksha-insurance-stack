@@ -1,77 +1,134 @@
 # Suraksha Insurance
 
-## What is this application all about?
+## Brief about the application
 
-Suraksha is a full-stack insurance platform demo covering the core customer
-and back-office journeys for an insurer: registering and logging in, viewing
-policies, filing claims, paying premiums, and having those claims triaged
-and scored for fraud risk. On top of that operational core, it layers a set
-of AI-assisted features (claim triage summaries, a support chatbot, a
-natural-language claim-filing assistant, document/photo analysis, policy
-recommendations, renewal insights, and an adjuster Q&A tool) that use the
-Anthropic API to help customers and staff move faster without replacing the
-deterministic business logic underneath them.
+Suraksha is a full-stack insurance platform for the Indian market, covering **health, motor and life** policies.
+Customers can register (with optional multi-factor authentication), view their policies, file and track claims,
+pay premiums through Razorpay, raise grievances and receive renewal reminders. Agents and claims adjusters get their
+own workspaces on the same platform.
 
-## About Application Stack
+Every claim is automatically screened for fraud risk by a separate service, and an AI layer built on **Spring AI**
+(using Anthropic Claude) helps both customers and staff: a support chatbot that can look up your own policies and
+claims, a "describe what happened" claim-filing assistant, bill/photo reading, plan comparison, renewal explanations,
+and briefing notes for adjusters.
 
-- **Frontend:** React (Vite), served on port 5173 in local dev
-- **Backend API:** Spring Boot (Java 21), the main REST service for auth,
-  policies, claims, and payments — port 8080
-- **Fraud detection service:** a separate Spring Boot microservice that
-  consumes claim events and scores fraud risk — port 8081
-- **AI service:** a separate Spring Boot microservice wrapping the
-  Anthropic API for all AI-assisted features — port 8082
-- **Database:** PostgreSQL
-- **Cache / session store:** Redis (refresh tokens)
-- **Messaging:** Kafka (claim submission/flagging events between backend and
-  fraud-detection-service)
-- **Payments:** Razorpay (Orders API + signature-verified webhook)
-- **Containerization:** Docker Compose for local dev, Kubernetes manifests
-  (`k8s/`) for deployment
+The guiding rule of the platform: **AI assists, people and deterministic rules decide.** Nothing in the AI layer can
+approve, reject or pay a claim.
 
-## About Application Architecture
+---
 
-Suraksha is split into four independently deployable services around a
-shared PostgreSQL database:
+## Application stack
 
-1. **`backend`** — the primary Spring Boot API. Owns authentication (JWT
-   access tokens + Redis-backed refresh tokens, double-submit-cookie CSRF
-   protection), and the Policy, Claims, and Payment domains. Publishes a
-   `claim.submitted` Kafka event whenever a claim is filed.
-2. **`fraud-detection-service`** — consumes `claim.submitted`, scores the
-   claim against policy coverage and open-claims signals, writes the risk
-   score back to the database, and publishes `claim.flagged` for claims that
-   cross a risk threshold. Has no public endpoints; it only talks to
-   Kafka and the database.
-3. **`ai-service`** — consumes `claim.flagged` to generate adjuster triage
-   notes, and exposes REST endpoints for the chatbot, document/photo
-   analysis, the claim-filing assistant, renewal insights, and adjuster
-   Q&A, all backed by the Anthropic API with rule-based fallbacks when no
-   API key is configured.
-4. **`frontend`** — the React SPA that customers, agents, and adjusters use,
-   talking to `backend` and `ai-service` over REST.
+| Layer | Technology |
+|---|---|
+| Frontend | React (Vite) + Tailwind CSS, served on port 5173 in local dev |
+| Backend API | Spring Boot, Java 21 (port 8080): authentication, policies, claims, payments, health-insurance features, grievances, notifications, audit log |
+| Fraud detection service | Spring Boot, Java 21 (port 8081): scores every submitted claim and flags risky ones |
+| **AI service** | **Spring Boot 3.5 + Spring AI 1.1, Java 21 (port 8082)** with the Anthropic Claude model |
+| Database | PostgreSQL (shared by the three services) |
+| Session store | Redis (refresh tokens) |
+| Payments | Razorpay (Orders API + signature-verified webhook) |
+| Security | JWT access tokens, TOTP multi-factor authentication, device fingerprinting, login-attempt lockout, rate limiting, CSRF protection, field-level encryption for PAN / Aadhaar / diagnosis, internal service token between services |
+| Packaging and deployment | Docker Compose (local), Kubernetes manifests with deny-by-default network policies (`k8s/`), `render.yaml` |
 
-Service-to-service calls (fraud-detection-service and ai-service into
-backend's internal endpoints) are authenticated with a shared internal
-service token, separate from customer-facing JWTs. In Kubernetes, a
-deny-by-default NetworkPolicy set restricts traffic to only the paths each
-service actually needs, and an Ingress with TLS fronts the public-facing
-services.
+### Spring AI in the application
 
-## Health insurance features
+All AI features live in `ai-service` and go through Spring AI's `ChatClient`.
 
-Health policies have extra behaviour on top of the generic policy/claim flow:
+| Spring AI feature | Where it is used |
+|---|---|
+| **ChatClient** (Anthropic starter) | `AnthropicClient` is a thin facade over `ChatClient`. Every AI feature uses it, and it keeps the "no API key, return a clearly labelled fallback" behaviour so the whole stack runs without a key. |
+| **Structured output** (`.entity(...)`) | Claim-filing assistant (`ClaimDraft`), document field extraction (`ExtractedDocument`) and urgency triage (`UrgencyAssessment`) map the model's reply straight onto Java records instead of hand-parsing JSON. |
+| **Chat memory** (`MessageChatMemoryAdvisor`, JDBC repository) | The support chatbot remembers the conversation. History is stored in PostgreSQL, namespaced per signed-in user, so it survives restarts and is shared across replicas. |
+| **Tool calling** (`@Tool`) | The chatbot can call read-only tools, `getMyPolicies` and `getMyClaims`. The customer id comes from the validated JWT, never from the model, and fraud or triage data is never returned. |
+| **Advisors** (`CallAdvisor`) | `UsageLoggingAdvisor` logs model, token usage and latency for every call. |
+| **Multimodal input** | Claim photos and bills are sent to the model as image media for description and field extraction. |
+| Guardrails around Spring AI | `PromptGuard` (untrusted-content wrapping and a check that blocks approve/deny language) and `PiiRedactor` (masks card, Aadhaar, PAN, e-mail and phone numbers before anything reaches the model or chat memory). |
 
-- **Insured members** (`/api/policies/{id}/members`): people covered under a health policy (up to 6, one "self").
-  Declared pre-existing conditions are encrypted at rest with the same converter as PAN/Aadhaar.
-- **Coverage tracker** (`/api/policies/{id}/coverage`): sum insured, used (approved/settled), reserved by
-  pending claims, remaining, plus the plan terms (room-rent cap, co-pay, waiting periods).
-- **Health claims** (`POST /api/claims` on a HEALTH policy): member, hospital, admission/discharge dates,
-  diagnosis (encrypted), doctor, accident flag and an itemised bill whose total must equal the claim amount.
-- **Deterministic assessment** (`HealthClaimAssessor`): room-rent proportionate deduction, co-pay, cap at
-  remaining sum insured, and waiting-period review notes. It produces an *estimate* and notes for the adjuster;
-  it never approves or rejects a claim. Read its class comment for the assumptions to confirm with your
-  product/compliance team.
-- New plan-term columns on `policies` (`room_rent_cap_per_day`, `co_pay_percent`, `initial_waiting_days`,
-  `pre_existing_waiting_months`) are nullable; null means no cap / 0% / 30 days / 24 months.
-- Adjuster reads of a claim that has health details are written to the audit log (`HEALTH_CLAIM_VIEWED`).
+Configuration: set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`) on `ai-service`. Without a key, every AI
+feature returns a labelled fallback.
+
+### Application architecture
+
+```mermaid
+flowchart LR
+    U["Customer / Agent / Adjuster<br/>React SPA"]
+
+    subgraph Platform["Suraksha services"]
+        B["backend :8080<br/>auth, policies, claims,<br/>payments, health, audit"]
+        F["fraud-detection-service :8081<br/>risk scoring"]
+        subgraph AI["ai-service :8082 (Spring AI)"]
+            C["REST controllers<br/>chat, claim assistant, documents,<br/>urgency, renewal, adjuster Q&A"]
+            G["Guardrails<br/>PromptGuard + PiiRedactor"]
+            CC["AnthropicClient facade<br/>Spring AI ChatClient"]
+            AD["Advisors<br/>chat memory + usage logging"]
+            T["Tools<br/>getMyPolicies, getMyClaims"]
+            C --> G --> CC --> AD
+            CC --> T
+        end
+    end
+
+    PG[("PostgreSQL")]
+    R[("Redis")]
+    RZ["Razorpay"]
+    LLM["Anthropic Claude API"]
+
+    U -->|"REST + JWT"| B
+    U -->|"REST + JWT"| C
+    B --> PG
+    B --> R
+    B -->|"orders + webhook"| RZ
+    B -->|"POST /internal/claims/submitted"| F
+    F --> PG
+    F -->|"POST /internal/claims/flagged"| C
+    AD -->|"prompts, images, tool calls"| LLM
+    AD -->|"chat memory"| PG
+    T -->|"read-only, scoped to the signed-in user"| PG
+    C -->|"triage notes"| PG
+```
+
+**How a claim flows through the system**
+
+1. The customer files a claim, by hand or with the AI claim assistant. `backend` saves it and notifies `fraud-detection-service`.
+2. `fraud-detection-service` scores the claim against policy coverage and open-claim signals and writes the score back to the database.
+3. Claims above the risk threshold are sent to `ai-service`, which writes a short triage note for the adjuster (facts and what to check, never a decision).
+4. A human adjuster reviews the claim, can ask the AI questions about claim records, and makes the decision.
+
+---
+
+## Questions and answers
+
+### 1. What is this application all about?
+
+Suraksha is a digital insurance platform that takes a policyholder from buying and managing a policy to filing,
+tracking and settling a claim. It also gives insurer staff the tools to review claims quickly.
+
+For customers it covers registration and login (with optional MFA), policies, claims, premium payments through
+Razorpay, grievances and renewal reminders. Health policies add insured members, a coverage tracker (sum insured,
+used, reserved, remaining, plus room-rent cap, co-pay and waiting periods) and an itemised hospital-bill claim.
+
+Behind that sits a fraud-screening service and an AI service. The AI service helps with everyday questions,
+drafting claims, reading documents and preparing adjuster briefings, but it never makes the decision.
+
+This repository is a reference implementation. Plans, premiums and seed data are illustrative, and the business
+assumptions in the health-claim assessor should be confirmed with your product and compliance teams before any real use.
+
+### 2. Why is this application different from other applications?
+
+- **AI assists, it doesn't decide.** Prompts forbid approval or rejection language, and the code enforces it: replies that sound like a decision are replaced with a safe message. Health-claim estimates come from a deterministic assessor that produces notes for the adjuster and never approves or rejects.
+- **The assistant works on your real data, safely.** The chatbot uses Spring AI tool calling to read your policies and claims. It is scoped to the signed-in user by the server, and it cannot see internal fraud scores or triage notes.
+- **Explainable fraud screening.** Risk scores come from transparent rule-based signals, and the AI explains those signals to the adjuster in plain language instead of acting as a black box.
+- **Privacy by design.** PAN, Aadhaar and diagnosis are encrypted at rest. Card, Aadhaar, PAN, e-mail and phone numbers are masked before text goes to the model or into stored chat history. Adjuster access to health claim details is written to an audit log.
+- **Built for Indian insurance.** It uses rupee amounts, Razorpay payments, PAN and Aadhaar handling, and health-plan rules such as room-rent proportionate deduction, co-pay and waiting periods.
+- **Security is layered.** MFA, device fingerprinting, login lockout, rate limiting, CSRF protection, service-to-service tokens and deny-by-default Kubernetes network policies.
+- **It degrades gracefully.** With no AI key configured, every feature falls back to a clearly labelled response, so the platform keeps working.
+
+### 3. Why should an end user use this application compared to other applications?
+
+- **One place for everything.** Policies, claims, payments, grievances and renewal reminders live in one app, so you don't need to chase separate portals or paperwork.
+- **Filing a claim is easier.** Describe what happened in your own words and the assistant drafts the claim form for you. It asks follow-up questions instead of guessing missing details. Upload a bill or photo and the key fields are read for you.
+- **Get answers about your own policies and claims any time.** The in-app assistant looks up your cover and your claims' current status. It doesn't guess about outcomes and points you to a human when you need one.
+- **You can see where you stand.** For health policies, the coverage tracker shows what is used, what is reserved by pending claims and what remains, along with the room-rent, co-pay and waiting-period terms that affect a claim.
+- **Plain-language help.** Plan comparison against your situation and clear renewal explanations help you understand your cover before you decide.
+- **Fair, human-made decisions.** Claims are decided by a claims adjuster. Fraud screening and AI notes only help route and prepare the claim faster.
+- **Your sensitive data is handled carefully.** Your identity and medical details are encrypted, they are masked before reaching the AI model, and your chat history is visible only to you. You can also clear it with "New chat".

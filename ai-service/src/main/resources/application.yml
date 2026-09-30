@@ -12,6 +12,24 @@ spring:
     hibernate:
       ddl-auto: none   # reads/updates tables owned by backend — same pattern as fraud-detection-service
     open-in-view: false
+  ai:
+    # Spring AI's Anthropic auto-configuration insists on a non-empty key at
+    # startup. The placeholder is never sent anywhere: AnthropicClient checks
+    # the separate anthropic.api-key below and returns its canned fallback
+    # when no real key is configured, exactly as before.
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:not-configured}
+      chat:
+        options:
+          model: ${ANTHROPIC_MODEL:claude-sonnet-5-5}
+          max-tokens: 700
+    chat:
+      memory:
+        repository:
+          jdbc:
+            # Creates the SPRING_AI_CHAT_MEMORY table on first start so support-chat
+            # history is shared across ai-service replicas and survives restarts.
+            initialize-schema: always
   # Kafka is no longer used — see ClaimFlaggedController, which replaced the
   # old @KafkaListener with a direct HTTP endpoint that fraud-detection-service calls.
 

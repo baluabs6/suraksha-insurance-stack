@@ -1,14 +1,12 @@
 package com.suraksha.ai.claimassistant;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.suraksha.ai.client.AnthropicClient;
+import com.suraksha.ai.security.PromptGuard;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -23,17 +21,6 @@ public class ClaimAssistantController {
             incident into a draft claim form. You are given the customer's own
             policies (id, type, policy number, plan name) and their narrative.
 
-            Respond with ONLY a single JSON object, no markdown fences, no
-            preamble, matching exactly this shape:
-            {
-              "matchedPolicyId": "<one of the given policy ids, or null if none fit>",
-              "matchConfidence": "high" | "low" | "none",
-              "suggestedIncidentDate": "<YYYY-MM-DD or null if not mentioned>",
-              "suggestedClaimAmount": "<plain number, no currency symbol or commas, or null if not mentioned>",
-              "cleanedDescription": "<the narrative rewritten as a clear, neutral, factual 2-3 sentence claim description, in the customer's own words as much as possible, no invented details>",
-              "clarifyingQuestions": ["<question>", ...]
-            }
-
             Rules:
             - Never invent an incident date, amount, or detail the customer
               didn't mention. If something's missing, leave it null and add a
@@ -43,12 +30,13 @@ public class ClaimAssistantController {
             - clarifyingQuestions should list only what's actually missing or
               ambiguous (e.g. exact date, estimated amount) — empty array if
               nothing's missing.
+            - cleanedDescription stays in the customer's own words as much as
+              possible.
             - Do not decide whether this is a valid claim or estimate whether
               it will be approved.
             """;
 
     private final AnthropicClient anthropicClient;
-    private final ObjectMapper mapper = new ObjectMapper();
 
     @PostMapping("/extract")
     public ClaimAssistantResponse extract(@Valid @RequestBody ClaimAssistantRequest req) {
@@ -61,35 +49,25 @@ public class ClaimAssistantController {
                     .collect(Collectors.joining("\n"));
 
         String userMessage = "Customer's policies:\n" + policyList
-                + "\n\nCustomer's narrative:\n" + req.getNarrative();
+                + "\n\nCustomer's narrative:\n" + PromptGuard.wrapUntrusted(req.getNarrative());
 
-        String fallbackJson = "__FALLBACK__";
-        String raw = anthropicClient.complete(SYSTEM_PROMPT, userMessage, fallbackJson);
+        return anthropicClient.completeStructured(PromptGuard.ANTI_INJECTION_PREAMBLE + "\n" + SYSTEM_PROMPT, userMessage, ClaimDraft.class)
+                .map(draft -> toResponse(draft, policies, req.getNarrative()))
+                .orElseGet(() -> fallbackResponse(req.getNarrative()));
+    }
 
-        if (fallbackJson.equals(raw) || !anthropicClient.isConfigured()) {
-            return fallbackResponse(req.getNarrative());
-        }
-
-        try {
-            String cleaned = stripCodeFences(raw);
-            JsonNode node = mapper.readTree(cleaned);
-            List<String> questions = new ArrayList<>();
-            if (node.path("clarifyingQuestions").isArray()) {
-                node.path("clarifyingQuestions").forEach(q -> questions.add(q.asText()));
-            }
-            return new ClaimAssistantResponse(
-                    nullableText(node, "matchedPolicyId"),
-                    node.path("matchConfidence").asText("none"),
-                    nullableText(node, "suggestedIncidentDate"),
-                    nullableText(node, "suggestedClaimAmount"),
-                    node.path("cleanedDescription").asText(req.getNarrative()),
-                    questions,
-                    false
-            );
-        } catch (Exception e) {
-            log.warn("Could not parse claim-assistant JSON response, falling back to raw narrative.", e);
-            return fallbackResponse(req.getNarrative());
-        }
+    private ClaimAssistantResponse toResponse(ClaimDraft draft, List<ClaimAssistantRequest.PolicyOption> policies, String narrative) {
+        // Server-side check on top of the prompt rule: a matched id must be one the customer actually owns.
+        String matched = draft.matchedPolicyId();
+        boolean known = matched != null && policies.stream().anyMatch(p -> matched.equals(p.getId()));
+        String confidence = known ? (draft.matchConfidence() == null ? "low" : draft.matchConfidence()) : "none";
+        List<String> questions = draft.clarifyingQuestions() == null ? List.of() : draft.clarifyingQuestions();
+        String description = draft.cleanedDescription() == null || draft.cleanedDescription().isBlank()
+                ? narrative : draft.cleanedDescription();
+        return new ClaimAssistantResponse(
+                known ? matched : null, confidence,
+                draft.suggestedIncidentDate(), draft.suggestedClaimAmount(),
+                description, questions, false);
     }
 
     private ClaimAssistantResponse fallbackResponse(String narrative) {
@@ -100,16 +78,5 @@ public class ClaimAssistantController {
         );
     }
 
-    private static String nullableText(JsonNode node, String field) {
-        JsonNode v = node.path(field);
-        return (v.isMissingNode() || v.isNull()) ? null : v.asText();
-    }
 
-    private static String stripCodeFences(String s) {
-        String t = s.trim();
-        if (t.startsWith("```")) {
-            t = t.replaceFirst("^```[a-zA-Z]*\\n", "").replaceFirst("```\\s*$", "");
-        }
-        return t.trim();
-    }
 }

@@ -1,14 +1,11 @@
 package com.suraksha.ai.docanalysis;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.suraksha.ai.client.AnthropicClient;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -24,17 +21,6 @@ public class DocumentAnalysisController {
             need to key into a system, so they don't have to read the image
             themselves.
 
-            Respond with ONLY a single JSON object, no markdown fences, no
-            preamble, matching exactly this shape:
-            {
-              "documentType": "<one short label, e.g. 'medical bill', 'repair estimate', 'invoice', 'unclear'>",
-              "extractedAmount": "<the total amount shown, plain number no currency symbol or commas, or null if not visible>",
-              "extractedDate": "<the document's date in YYYY-MM-DD if visible, or null>",
-              "merchantOrProvider": "<the hospital/garage/vendor name shown, or null>",
-              "lineItems": ["<short line item description>", ...],
-              "notes": "<one short sentence flagging anything illegible, inconsistent, or missing — or empty string if nothing to flag>"
-            }
-
             Rules:
             - Extract only what is actually visible in the image. Never
               invent an amount, date, or name that isn't shown.
@@ -43,8 +29,6 @@ public class DocumentAnalysisController {
             - Never state or imply whether the claim should be approved,
               denied, or looks fraudulent — that is a human adjuster's job.
             """;
-
-    private final ObjectMapper mapper = new ObjectMapper();
 
     private static final String SYSTEM_PROMPT = """
             You are looking at a single photo attached to an insurance claim
@@ -96,33 +80,15 @@ public class DocumentAnalysisController {
 
         String userMessage = "Claim type: " + claimType + "\n\nExtract the structured fields from the attached image.";
 
-        String fallbackSentinel = "__FALLBACK__";
-        String raw = anthropicClient.completeWithImage(
-                EXTRACTION_SYSTEM_PROMPT, userMessage, req.getImageBase64(), req.getMediaType(), fallbackSentinel);
-
-        if (fallbackSentinel.equals(raw) || !anthropicClient.isConfigured()) {
-            return fallbackExtraction();
-        }
-
-        try {
-            JsonNode node = mapper.readTree(stripCodeFences(raw));
-            List<String> lineItems = new ArrayList<>();
-            if (node.path("lineItems").isArray()) {
-                node.path("lineItems").forEach(item -> lineItems.add(item.asText()));
-            }
-            return new DocumentExtractionResponse(
-                    node.path("documentType").asText("unclear"),
-                    nullableText(node, "extractedAmount"),
-                    nullableText(node, "extractedDate"),
-                    nullableText(node, "merchantOrProvider"),
-                    lineItems,
-                    node.path("notes").asText(""),
-                    false
-            );
-        } catch (Exception e) {
-            log.warn("Could not parse document-extraction JSON response, falling back.", e);
-            return fallbackExtraction();
-        }
+        return anthropicClient.completeStructuredWithImage(
+                        EXTRACTION_SYSTEM_PROMPT, userMessage, req.getImageBase64(), req.getMediaType(), ExtractedDocument.class)
+                .map(doc -> new DocumentExtractionResponse(
+                        doc.documentType() == null ? "unclear" : doc.documentType(),
+                        doc.extractedAmount(), doc.extractedDate(), doc.merchantOrProvider(),
+                        doc.lineItems() == null ? List.of() : doc.lineItems(),
+                        doc.notes() == null ? "" : doc.notes(),
+                        false))
+                .orElseGet(this::fallbackExtraction);
     }
 
     private DocumentExtractionResponse fallbackExtraction() {
@@ -131,16 +97,5 @@ public class DocumentAnalysisController {
                         + "please read the attached document manually.", true);
     }
 
-    private static String nullableText(JsonNode node, String field) {
-        JsonNode v = node.path(field);
-        return (v.isMissingNode() || v.isNull()) ? null : v.asText();
-    }
 
-    private static String stripCodeFences(String s) {
-        String t = s.trim();
-        if (t.startsWith("```")) {
-            t = t.replaceFirst("^```[a-zA-Z]*\\n", "").replaceFirst("```\\s*$", "");
-        }
-        return t.trim();
-    }
 }
