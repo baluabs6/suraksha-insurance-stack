@@ -1,6 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  SPRING_PROFILES_ACTIVE: "prod"
   name: suraksha-config
   namespace: suraksha
 data:
@@ -9,6 +10,6 @@ data:
   SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/suraksha"
   SPRING_REDIS_HOST: "redis"
   SPRING_REDIS_PORT: "6379"
-  ANTHROPIC_MODEL: "claude-sonnet-5"
+  ANTHROPIC_MODEL: "claude-sonnet-5-5"
   VITE_API_BASE_URL: "https://api.suraksha.example.com"
   VITE_AI_API_BASE_URL: "https://ai.suraksha.example.com"

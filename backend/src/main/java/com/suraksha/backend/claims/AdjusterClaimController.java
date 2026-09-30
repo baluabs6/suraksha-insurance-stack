@@ -66,6 +66,12 @@ public class AdjusterClaimController {
             return ResponseEntity.badRequest().body(Map.of("message", "Claim is already in that status."));
         }
 
+        if (!previous.canTransitionTo(req.getStatus())) {
+            return ResponseEntity.badRequest().body(Map.of("message",
+                    "A claim cannot move from " + statusLabel(previous).toLowerCase()
+                            + " to " + statusLabel(req.getStatus()).toLowerCase() + "."));
+        }
+
         UUID adjusterId = UUID.fromString(auth.getName());
 
         claim.setStatus(req.getStatus());

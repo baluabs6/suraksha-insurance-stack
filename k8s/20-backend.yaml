@@ -30,6 +30,10 @@ spec:
               valueFrom: { secretKeyRef: { name: suraksha-secrets, key: SPRING_DATASOURCE_USERNAME } }
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom: { secretKeyRef: { name: suraksha-secrets, key: SPRING_DATASOURCE_PASSWORD } }
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom: { secretKeyRef: { name: suraksha-secrets, key: INTERNAL_SERVICE_TOKEN } }
+            - name: APP_CRYPTO_KEY
+              valueFrom: { secretKeyRef: { name: suraksha-secrets, key: APP_CRYPTO_KEY } }
             - name: JWT_SECRET
               valueFrom: { secretKeyRef: { name: suraksha-secrets, key: JWT_SECRET } }
           resources:

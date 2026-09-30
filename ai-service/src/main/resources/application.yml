@@ -45,7 +45,7 @@ management:
 
 anthropic:
   api-key: ${ANTHROPIC_API_KEY:}
-  model: ${ANTHROPIC_MODEL:claude-sonnet-5}
+  model: ${ANTHROPIC_MODEL:claude-sonnet-5-5}
   # If api-key is blank, every AI feature below falls back to a canned,
   # clearly-labeled response instead of failing — so the whole stack still
   # runs and demos end-to-end without anyone needing an API key on day one.

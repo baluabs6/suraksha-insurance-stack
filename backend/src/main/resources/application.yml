@@ -1,5 +1,8 @@
 server:
   port: ${PORT:8080}
+  # Honour X-Forwarded-* only from trusted proxies (Tomcat RemoteIpValve). The default
+  # trusts private ranges; tighten via SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES.
+  forward-headers-strategy: native
 
 spring:
   datasource:
@@ -27,6 +30,10 @@ fraud:
     base-url: ${FRAUD_SERVICE_URL:http://localhost:8081}
 
 app:
+  payments:
+    # Instant "PAID" mock payments when Razorpay keys are blank. Local demo only:
+    # keep false everywhere else (payments then return 503 instead of faking success).
+    mock-enabled: ${APP_PAYMENTS_MOCK_ENABLED:false}
   internal-service-token: ${INTERNAL_SERVICE_TOKEN:dev-only-internal-token-change-me-before-production}
   jwt:
     secret: ${JWT_SECRET:dev-only-secret-change-me-before-production-32chars-min}

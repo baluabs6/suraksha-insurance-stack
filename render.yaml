@@ -2,6 +2,17 @@ databases:
   - name: suraksha-postgres
     plan: free            # 1GB, expires 30 days after creation — switch to a paid plan before then
 
+envVarGroups:
+  # Values here are generated once and shared, so backend / ai-service / fraud-detection
+  # verify the same JWT_SECRET and INTERNAL_SERVICE_TOKEN. (Before this, ai-service and
+  # fraud-detection silently fell back to the committed dev defaults.)
+  - name: suraksha-shared-secrets
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: INTERNAL_SERVICE_TOKEN
+        generateValue: true
+
 services:
   # --- backend (Spring Boot, public API) --------------------------------------
   - type: web
@@ -12,6 +23,7 @@ services:
     plan: free              # spins down after 15 min idle
     healthCheckPath: /actuator/health
     envVars:
+      - fromGroup: suraksha-shared-secrets
       - key: SPRING_DATASOURCE_URL
         fromDatabase:
           name: suraksha-postgres
@@ -39,8 +51,10 @@ services:
           type: web
           name: suraksha-fraud-detection
           property: hostport   # resolves to the service's onrender.com host — see note below
-      - key: JWT_SECRET
-        generateValue: true
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: APP_CRYPTO_KEY        # base64 of 32 random bytes; set once in the dashboard, never rotate casually
+        sync: false
       - key: APP_CORS_ORIGIN
         value: https://suraksha-frontend.onrender.com   # confirm this matches the frontend's actual onrender.com URL after first deploy
       - key: RAZORPAY_KEY_ID
@@ -59,6 +73,9 @@ services:
     plan: free
     healthCheckPath: /actuator/health
     envVars:
+      - fromGroup: suraksha-shared-secrets
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
       - key: SPRING_DATASOURCE_URL
         fromDatabase:
           name: suraksha-postgres
@@ -86,6 +103,9 @@ services:
     plan: free
     healthCheckPath: /actuator/health
     envVars:
+      - fromGroup: suraksha-shared-secrets
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
       - key: SPRING_DATASOURCE_URL
         fromDatabase:
           name: suraksha-postgres
@@ -101,7 +121,7 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ANTHROPIC_MODEL
-        value: claude-sonnet-5
+        value: claude-sonnet-5-5
 
   # --- frontend (static site — free, no spin-down) --------------------------
   - type: web

@@ -231,10 +231,10 @@ public class AuthController {
     }
 
     private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
+        // Do not read X-Forwarded-For here: any client can send it and dodge the
+        // rate limits. server.forward-headers-strategy=native (application.yml) makes
+        // Tomcat apply it only when it comes from a trusted proxy, and then
+        // getRemoteAddr() already returns the real client address.
         return request.getRemoteAddr();
     }
 }

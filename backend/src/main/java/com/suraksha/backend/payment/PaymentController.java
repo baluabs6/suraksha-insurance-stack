@@ -4,6 +4,7 @@ import com.suraksha.backend.payment.gateway.RazorpayClient;
 import com.suraksha.backend.policy.Policy;
 import com.suraksha.backend.policy.PolicyRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +23,9 @@ public class PaymentController {
     private final PolicyRepository policyRepository;
     private final RazorpayClient razorpayClient;
 
+    @Value("${app.payments.mock-enabled:false}")
+    private boolean mockPaymentsEnabled;
+
     @GetMapping
     public List<Payment> myPayments(Authentication auth) {
         return paymentRepository.findByPolicyUserIdOrderByPaidAtDesc(UUID.fromString(auth.getName()));
@@ -38,6 +42,10 @@ public class PaymentController {
         }
 
         if (!razorpayClient.isConfigured()) {
+            if (!mockPaymentsEnabled) {
+                return ResponseEntity.status(503).body(Map.of("message",
+                        "Payments are not available right now. Please try again later."));
+            }
             Payment payment = Payment.builder()
                     .policy(policy).amount(policy.getPremium()).method("UPI")
                     .gatewayTxnId("MOCK-" + UUID.randomUUID().toString().substring(0, 12).toUpperCase())

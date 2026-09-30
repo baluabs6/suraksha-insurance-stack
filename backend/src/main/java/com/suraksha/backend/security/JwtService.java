@@ -54,7 +54,21 @@ public class JwtService {
                 .compact();
     }
 
+    /**
+     * Parses a session (access) token. Returns null for anything that is not a
+     * genuine access token: bad signature, expired, or a purpose-scoped token
+     * such as the MFA-pending token. Without the purpose check, the token issued
+     * after the password step alone could be used as a full session.
+     */
     public Claims parseAccessToken(String token) {
+        Claims claims = parseSigned(token);
+        if (claims == null || claims.get("purpose") != null || claims.get("role", String.class) == null) {
+            return null;
+        }
+        return claims;
+    }
+
+    private Claims parseSigned(String token) {
         try {
             return Jwts.parserBuilder().setSigningKey(key).build()
                     .parseClaimsJws(token).getBody();
@@ -76,7 +90,7 @@ public class JwtService {
     }
 
     public UUID validateMfaPendingToken(String token) {
-        Claims claims = parseAccessToken(token);
+        Claims claims = parseSigned(token);
         if (claims == null || !MFA_PENDING_PURPOSE.equals(claims.get("purpose", String.class))) {
             return null;
         }

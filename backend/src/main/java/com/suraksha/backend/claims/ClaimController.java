@@ -4,6 +4,7 @@ import com.suraksha.backend.claims.dto.ClaimRequest;
 import com.suraksha.backend.claims.events.ClaimEventPublisher;
 import com.suraksha.backend.policy.Policy;
 import com.suraksha.backend.policy.PolicyRepository;
+import com.suraksha.backend.policy.PolicyStatus;
 import com.suraksha.backend.user.User;
 import com.suraksha.backend.user.UserRepository;
 import jakarta.validation.Valid;
@@ -13,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,6 +44,20 @@ public class ClaimController {
                 .orElse(null);
         if (policy == null) {
             return ResponseEntity.status(404).body(Map.of("message", "Policy not found for this account."));
+        }
+
+        LocalDate today = LocalDate.now();
+        if (policy.getStatus() != PolicyStatus.ACTIVE) {
+            return ResponseEntity.badRequest().body(Map.of("message", "This policy is not active, so a claim can't be filed against it."));
+        }
+        if (req.getIncidentDate().isAfter(today)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "The incident date can't be in the future."));
+        }
+        if (req.getIncidentDate().isBefore(policy.getStartDate()) || req.getIncidentDate().isAfter(policy.getEndDate())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "The incident date falls outside this policy's coverage period."));
+        }
+        if (req.getClaimAmount().compareTo(policy.getCoverageAmount()) > 0) {
+            return ResponseEntity.badRequest().body(Map.of("message", "The claim amount is more than this policy's coverage."));
         }
 
         User user = userRepository.findById(userId).orElseThrow();
