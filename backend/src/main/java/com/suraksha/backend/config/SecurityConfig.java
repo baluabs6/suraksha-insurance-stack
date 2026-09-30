@@ -49,6 +49,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/mfa/verify").permitAll()
                 .requestMatchers("/api/payments/webhook").permitAll()
+                .requestMatchers("/api/products").permitAll()
                 .requestMatchers("/actuator/health/**", "/actuator/prometheus").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/adjuster/**").hasAnyRole("CLAIMS_ADJUSTER", "ADMIN")

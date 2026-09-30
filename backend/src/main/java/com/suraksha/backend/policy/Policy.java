@@ -4,9 +4,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.suraksha.backend.user.User;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -65,6 +68,11 @@ public class Policy {
 
     /** Months before declared pre-existing conditions are covered; null = 24. */
     private Integer preExistingWaitingMonths;
+
+    /** What is insured, e.g. vehicle registration, trip destination or property address. Optional. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> attributes;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)

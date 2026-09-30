@@ -49,7 +49,7 @@ public class SupportTools {
                             String recordedStatus, String description) {}
 
     @Tool(description = "List the signed-in customer's own insurance policies: policy number, plan name, "
-            + "type (HEALTH, MOTOR or LIFE), coverage amount, premium and start/end dates. "
+            + "insurance type (for example HEALTH, MOTOR, TWO_WHEELER, TRAVEL, HOME), coverage amount, premium and start/end dates. "
             + "Use this before answering questions about what the customer is covered for.")
     public List<PolicyInfo> getMyPolicies(ToolContext toolContext) {
         UUID userId = currentUser(toolContext);

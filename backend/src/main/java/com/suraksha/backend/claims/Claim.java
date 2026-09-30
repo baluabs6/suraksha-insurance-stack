@@ -6,10 +6,13 @@ import com.suraksha.backend.security.EncryptedStringConverter;
 import com.suraksha.backend.user.User;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -96,6 +99,11 @@ public class Claim {
 
     @Column(length = 2000)
     private String assessmentNotes;
+
+    /** Type-specific claim details (vehicle, trip, property...), validated against the product definition. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> details;
 
     @Column(name = "status_updated_by")
     private UUID statusUpdatedBy;

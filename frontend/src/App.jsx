@@ -9,8 +9,8 @@ import ChatWidget from "./ChatWidget.jsx";
 import HealthPolicyPanel from "./health/HealthPolicyPanel.jsx";
 import HealthClaimFields from "./health/HealthClaimFields.jsx";
 import { EMPTY_HEALTH_CLAIM, BILL_FIELDS, billTotal } from "./health/format.js";
-
-const planIcon = (type) => (type === "HEALTH" ? HeartPulse : type === "MOTOR" ? Car : Umbrella);
+import ProductClaimFields, { DocumentChecklist } from "./ProductClaimFields.jsx";
+import { planIcon, productFor, useProducts, humanize, validateProductDetails, cleanDetails } from "./products.js";
 
 const statusStyle = (status) => {
   const good = ["ACTIVE", "PAID", "SETTLED", "APPROVED", "LOW"];
@@ -46,11 +46,8 @@ function Nav({ onLogin }) {
 }
 
 function Landing({ onLogin }) {
-  const plans = [
-    { type: "HEALTH", name: "CarePlus Family", from: "₹649/month", line: "Covers the whole family under one policy, no sub-limits on room rent." },
-    { type: "MOTOR", name: "DriveSecure Comprehensive", from: "₹399/month", line: "Zero depreciation cover with a 60-minute garage cashless promise." },
-    { type: "LIFE", name: "LifeShield Term 30", from: "₹899/month", line: "₹50 lakh cover with a decision on your application within 48 hours." },
-  ];
+  const products = useProducts();
+  const categories = [...new Set(products.map((p) => p.category))];
   return (
     <div className="bg-[#F5F4EF] min-h-screen">
       <Nav onLogin={onLogin} />
@@ -73,25 +70,30 @@ function Landing({ onLogin }) {
         </div>
       </section>
       <section className="max-w-6xl mx-auto px-6 py-16">
-        <h2 className="font-serif text-2xl text-[#16303F] mb-8">Plans people actually keep</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((p) => {
-            const Icon = planIcon(p.type);
-            return (
-              <div key={p.name} className="bg-white border border-[#E4E1D8] rounded-lg p-6">
-                <Icon className="w-6 h-6 text-[#B8863C]" strokeWidth={1.5} />
-                <h3 className="font-serif text-lg text-[#16303F] mt-4">{p.name}</h3>
-                <p className="text-sm text-[#4B5563] mt-2 leading-relaxed">{p.line}</p>
-                <div className="mt-5 flex items-center justify-between">
-                  <span className="text-sm text-[#16303F]">From {p.from}</span>
-                  <button onClick={onLogin} className="text-sm text-[#16303F] flex items-center gap-1">
-                    View plan <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <h2 className="font-serif text-2xl text-[#16303F] mb-8">Cover for every part of your life</h2>
+        {categories.map((category) => (
+          <div key={category} className="mb-10">
+            <h3 className="text-xs uppercase tracking-wide text-[#4B5563] mb-4">{category}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {products.filter((p) => p.category === category).map((p) => {
+                const Icon = planIcon(p.type);
+                return (
+                  <div key={p.type} className="bg-white border border-[#E4E1D8] rounded-lg p-6">
+                    <Icon className="w-6 h-6 text-[#B8863C]" strokeWidth={1.5} />
+                    <h3 className="font-serif text-lg text-[#16303F] mt-4">{p.planName}</h3>
+                    <p className="text-sm text-[#4B5563] mt-2 leading-relaxed">{p.tagline}</p>
+                    <div className="mt-5 flex items-center justify-between">
+                      <span className="text-sm text-[#16303F]">{p.fromPrice.startsWith("₹") ? `From ${p.fromPrice}` : p.fromPrice}</span>
+                      <button onClick={onLogin} className="text-sm text-[#16303F] flex items-center gap-1">
+                        View plan <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </section>
       <footer className="border-t border-[#E4E1D8]">
         <div className="max-w-6xl mx-auto px-6 py-8 text-sm text-[#4B5563] flex flex-wrap items-center justify-between gap-3">
@@ -289,6 +291,15 @@ function Policies({ policies }) {
                 <div className="flex justify-between"><span>Premium</span><span className="text-[#16303F]">{inr(p.premium)}/yr</span></div>
                 <div className="flex justify-between"><span>Ends</span><span className="text-[#16303F]">{p.endDate}</span></div>
               </div>
+              {p.attributes && Object.keys(p.attributes).length > 0 && (
+                <div className="mt-3 pt-3 border-t border-[#E4E1D8] text-xs text-[#4B5563] space-y-1">
+                  {Object.entries(p.attributes).map(([k, v]) => (
+                    <div key={k} className="flex justify-between gap-3">
+                      <span>{humanize(k)}</span><span className="text-[#16303F] text-right">{String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {p.type === "HEALTH" && <HealthPolicyPanel policy={p} />}
             </div>
           );
@@ -325,8 +336,11 @@ function FileClaim({ policies, onFiled }) {
   const [confirmed, setConfirmed] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [health, setHealth] = useState(EMPTY_HEALTH_CLAIM);
+  const [details, setDetails] = useState({});
 
-  const isHealth = policies.find((p) => p.id === policyId)?.type === "HEALTH";
+  const selectedPolicy = policies.find((p) => p.id === policyId);
+  const isHealth = selectedPolicy?.type === "HEALTH";
+  const product = selectedPolicy ? productFor(selectedPolicy.type) : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -346,6 +360,7 @@ function FileClaim({ policies, onFiled }) {
       if (!amount || Number(amount) <= 0) errs.amount = "Enter the amount you're claiming.";
       if (!incidentDate) errs.incidentDate = "Enter when the incident happened.";
       if (!description.trim()) errs.description = "Give a short description of what happened.";
+      Object.assign(errs, validateProductDetails(product, details));
     }
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
@@ -367,7 +382,7 @@ function FileClaim({ policies, onFiled }) {
             accidental: health.accidental,
             ...Object.fromEntries(BILL_FIELDS.map(([key]) => [key, health[key] === "" ? null : Number(health[key])])),
           }
-        : { policyId, claimAmount: Number(amount), incidentDate, description };
+        : { policyId, claimAmount: Number(amount), incidentDate, description, details: cleanDetails(details) };
       const { data: claim } = await api.post("/api/claims", payload);
       setConfirmed(claim);
       onFiled(claim);
@@ -401,7 +416,7 @@ function FileClaim({ policies, onFiled }) {
               <p className="mt-3 text-xs text-[#4B5563]">This is an estimate from your plan terms. The final amount is decided after an adjuster reviews your claim.</p>
             </div>
           )}
-          <button onClick={() => { setConfirmed(null); setPolicyId(""); setAmount(""); setIncidentDate(""); setDescription(""); setHealth(EMPTY_HEALTH_CLAIM); }}
+          <button onClick={() => { setConfirmed(null); setPolicyId(""); setAmount(""); setIncidentDate(""); setDescription(""); setHealth(EMPTY_HEALTH_CLAIM); setDetails({}); }}
             className="mt-6 text-sm px-4 py-2 rounded border border-[#16303F] text-[#16303F]">
             File another claim
           </button>
@@ -417,7 +432,7 @@ function FileClaim({ policies, onFiled }) {
       <form onSubmit={handleSubmit} className="mt-6 bg-white border border-[#E4E1D8] rounded-lg p-6 space-y-5">
         <div>
           <label className="text-sm text-[#16303F] block mb-1">Policy</label>
-          <select value={policyId} onChange={(e) => setPolicyId(e.target.value)}
+          <select value={policyId} onChange={(e) => { setPolicyId(e.target.value); setDetails({}); }}
             className="w-full border border-[#E4E1D8] rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#16303F]">
             <option value="">Select a policy</option>
             {policies.map((p) => (<option key={p.id} value={p.id}>{p.policyNumber} — {p.planName}</option>))}
@@ -446,6 +461,8 @@ function FileClaim({ policies, onFiled }) {
             className="w-full border border-[#E4E1D8] rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#16303F]" placeholder="Briefly describe the incident" />
           {errors.description && <p className="text-xs text-[#B0463D] mt-1">{errors.description}</p>}
         </div>
+        <ProductClaimFields product={product} values={details} onChange={setDetails} errors={errors} />
+        <DocumentChecklist product={product} />
           </>
         )}
         {errors.form && (
@@ -561,6 +578,7 @@ function Profile({ user }) {
 }
 
 export default function App() {
+  useProducts(); // loads the insurance catalogue so every screen shows the right icons and forms
   const [page, setPage] = useState("landing"); // landing | login | app
   const [active, setActive] = useState("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);

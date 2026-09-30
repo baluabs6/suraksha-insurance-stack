@@ -26,6 +26,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -100,6 +101,27 @@ public class DataSeeder implements CommandLineRunner {
                 .user(demoUser).policyNumber("POL-LF-1102938").planName("LifeShield Term 30")
                 .type(PolicyType.LIFE).coverageAmount(new BigDecimal("5000000")).premium(new BigDecimal("24000"))
                 .startDate(LocalDate.of(2026, 1, 10)).endDate(LocalDate.of(2056, 1, 9))
+                .status(PolicyStatus.ACTIVE).build());
+
+        policyRepository.save(Policy.builder()
+                .user(demoUser).agent(demoAgent).policyNumber("POL-TW-3301847").planName("RideSafe Two-Wheeler")
+                .type(PolicyType.TWO_WHEELER).coverageAmount(new BigDecimal("150000")).premium(new BigDecimal("1800"))
+                .startDate(LocalDate.of(2026, 3, 5)).endDate(LocalDate.of(2027, 3, 4))
+                .attributes(Map.of("vehicleRegistrationNumber", "KA-01-HX-4821", "vehicleModel", "Honda Activa 6G"))
+                .status(PolicyStatus.ACTIVE).build());
+
+        policyRepository.save(Policy.builder()
+                .user(demoUser).policyNumber("POL-TR-5502176").planName("Wanderly Travel Cover")
+                .type(PolicyType.TRAVEL).coverageAmount(new BigDecimal("500000")).premium(new BigDecimal("1499"))
+                .startDate(LocalDate.of(2026, 9, 20)).endDate(LocalDate.of(2026, 10, 10))
+                .attributes(Map.of("destination", "Singapore", "tripStart", "2026-09-20", "tripEnd", "2026-10-10"))
+                .status(PolicyStatus.ACTIVE).build());
+
+        policyRepository.save(Policy.builder()
+                .user(demoUser).policyNumber("POL-HM-7703952").planName("HomeShield Property")
+                .type(PolicyType.HOME).coverageAmount(new BigDecimal("2500000")).premium(new BigDecimal("3200"))
+                .startDate(LocalDate.of(2026, 4, 1)).endDate(LocalDate.of(2027, 3, 31))
+                .attributes(Map.of("propertyAddress", "Flat 402, Lakeview Apartments, Hyderabad", "propertyType", "Apartment"))
                 .status(PolicyStatus.ACTIVE).build());
 
         Claim healthClaim = claimRepository.save(Claim.builder()

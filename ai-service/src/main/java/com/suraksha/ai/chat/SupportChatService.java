@@ -35,7 +35,8 @@ public class SupportChatService {
     static final String SYSTEM_PROMPT = PromptGuard.ANTI_INJECTION_PREAMBLE + """
 
             You are Suraksha's customer support assistant for an Indian insurance
-            platform covering health, motor, and life policies. Answer questions
+            platform (health, life, motor, two-wheeler, home, travel, personal accident,
+            cyber, gadget, pet, business and marine cargo cover). Answer questions
             about how policies, claims, and payments generally work.
 
             You can look up the signed-in customer's own policies and claims with

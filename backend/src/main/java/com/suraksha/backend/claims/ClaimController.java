@@ -11,6 +11,8 @@ import com.suraksha.backend.policy.Policy;
 import com.suraksha.backend.policy.PolicyRepository;
 import com.suraksha.backend.policy.PolicyStatus;
 import com.suraksha.backend.policy.PolicyType;
+import com.suraksha.backend.product.ClaimDetailsValidator;
+import com.suraksha.backend.product.ProductRegistry;
 import com.suraksha.backend.user.User;
 import com.suraksha.backend.user.UserRepository;
 import jakarta.validation.Valid;
@@ -100,6 +102,16 @@ public class ClaimController {
             assessmentNotes = assessment.toNotes();
         }
 
+        // Every non-health line: the type-specific details are checked against that product's field definitions.
+        Map<String, Object> details = null;
+        if (!health) {
+            var checked = ClaimDetailsValidator.validate(ProductRegistry.get(policy.getType()), req.getDetails());
+            if (checked.error() != null) {
+                return ResponseEntity.badRequest().body(Map.of("message", checked.error()));
+            }
+            details = checked.details();
+        }
+
         User user = userRepository.findById(userId).orElseThrow();
 
         Claim claim = Claim.builder()
@@ -111,6 +123,7 @@ public class ClaimController {
                 .description(req.getDescription())
                 .status(ClaimStatus.SUBMITTED)
                 .submittedAt(Instant.now())
+                .details(details)
                 .build();
         if (health) {
             claim.setMemberId(member.getId());

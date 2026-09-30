@@ -9,6 +9,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -25,6 +26,9 @@ public class ClaimRequest {
 
     @NotBlank(message = "Give a short description of what happened.")
     private String description;
+
+    /** Type-specific fields for non-health policies; the allowed keys come from GET /api/products. */
+    private Map<String, Object> details;
 
     // ---- Health-policy claims only (ignored for other policy types) ----
     private UUID memberId;
