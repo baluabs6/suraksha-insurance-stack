@@ -75,6 +75,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: suraksha_pw
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+      APP_CORS_ORIGIN: http://localhost:5173
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,6 +93,32 @@ services:
     depends_on:
       - backend
       - ai-service
+
+  # Optional metrics stack: docker compose --profile monitoring up
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ["monitoring"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+      - fraud-detection-service
+      - ai-service
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    profiles: ["monitoring"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-locally}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
 
 volumes:
   pgdata:

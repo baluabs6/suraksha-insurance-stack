@@ -13,4 +13,6 @@ public interface ClaimRecordRepository extends JpaRepository<ClaimRecord, UUID> 
     List<ClaimRecord> findByRiskLevelOrderByIncidentDateDesc(String riskLevel);
 
     List<ClaimRecord> findTop25ByOrderByIncidentDateDesc();
+
+    List<ClaimRecord> findByClaimTypeOrderByIncidentDateDesc(String claimType);
 }

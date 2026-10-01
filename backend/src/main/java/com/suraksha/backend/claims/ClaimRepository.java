@@ -10,4 +10,5 @@ public interface ClaimRepository extends JpaRepository<Claim, UUID> {
     List<Claim> findByUserIdOrderBySubmittedAtDesc(UUID userId);
     List<Claim> findByPolicyIdAndStatusIn(UUID policyId, Collection<ClaimStatus> statuses);
     boolean existsByMemberId(UUID memberId);
+    List<Claim> findByStatusIn(Collection<ClaimStatus> statuses);
 }

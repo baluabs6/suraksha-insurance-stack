@@ -24,17 +24,22 @@ public final class ClaimDetailsValidator {
     private ClaimDetailsValidator() {}
 
     public static Result validate(ProductDefinition product, Map<String, Object> raw) {
+        return validate(product.label(), product.claimFields(), raw);
+    }
+
+    /** Same rules for any list of fields (claim forms and quote forms both use it). */
+    public static Result validate(String label, java.util.List<ClaimField> fields, Map<String, Object> raw) {
         Map<String, Object> input = raw == null ? Map.of() : raw;
 
         for (String key : input.keySet()) {
-            boolean known = product.claimFields().stream().anyMatch(f -> f.key().equals(key));
+            boolean known = fields.stream().anyMatch(f -> f.key().equals(key));
             if (!known) {
-                return Result.error("Unexpected claim detail '" + key + "' for a " + product.label() + " policy.");
+                return Result.error("Unexpected field '" + key + "' for a " + label + " policy.");
             }
         }
 
         Map<String, Object> cleaned = new LinkedHashMap<>();
-        for (ClaimField field : product.claimFields()) {
+        for (ClaimField field : fields) {
             Object value = input.get(field.key());
             boolean blank = value == null || value.toString().isBlank();
 

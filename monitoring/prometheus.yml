@@ -1,0 +1,17 @@
+# Scrapes the three Spring Boot services' Micrometer metrics. Start with: docker compose --profile monitoring up
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["backend:8080"]
+  - job_name: fraud-detection-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["fraud-detection-service:8081"]
+  - job_name: ai-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["ai-service:8082"]

@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import {
   Shield, FileText, CreditCard, User, LogOut, ChevronRight,
-  CheckCircle2, Menu, AlertCircle, Clock, TrendingUp, HeartPulse, Car, Umbrella,
+  CheckCircle2, Menu, AlertCircle, Clock, TrendingUp, HeartPulse, Car, Umbrella, PlusCircle,
 } from "lucide-react";
 import api from "./api/client.js";
 import aiApi from "./api/aiClient.js";
 import ChatWidget from "./ChatWidget.jsx";
+import BuyInsurance from "./BuyInsurance.jsx";
+import PolicyServicing from "./PolicyServicing.jsx";
+import ClaimDocuments from "./ClaimDocuments.jsx";
 import HealthPolicyPanel from "./health/HealthPolicyPanel.jsx";
 import HealthClaimFields from "./health/HealthClaimFields.jsx";
 import { EMPTY_HEALTH_CLAIM, BILL_FIELDS, billTotal } from "./health/format.js";
@@ -14,7 +17,7 @@ import { planIcon, productFor, useProducts, humanize, validateProductDetails, cl
 
 const statusStyle = (status) => {
   const good = ["ACTIVE", "PAID", "SETTLED", "APPROVED", "LOW"];
-  const pending = ["UNDER_REVIEW", "SUBMITTED", "PENDING", "MEDIUM"];
+  const pending = ["UNDER_REVIEW", "SUBMITTED", "PENDING", "PENDING_PAYMENT", "MEDIUM"];
   const risky = ["HIGH"];
   if (good.includes(status)) return "bg-[#E7F0EA] text-[#2E6E52]";
   if (pending.includes(status)) return "bg-[#FBF1DF] text-[#8A6412]";
@@ -171,6 +174,7 @@ function Sidebar({ active, setActive, onLogout, mobileOpen, setMobileOpen }) {
   const items = [
     { key: "dashboard", label: "Dashboard", icon: TrendingUp },
     { key: "policies", label: "My policies", icon: Shield },
+    { key: "buy", label: "Buy insurance", icon: PlusCircle },
     { key: "claim", label: "File a claim", icon: FileText },
     { key: "payments", label: "Payments", icon: CreditCard },
     { key: "profile", label: "Profile", icon: User },
@@ -259,7 +263,7 @@ function Dashboard({ userName, policies, claims }) {
   );
 }
 
-function Policies({ policies }) {
+function Policies({ policies, onChanged }) {
   const [recommendations, setRecommendations] = useState([]);
   const [loadingRecs, setLoadingRecs] = useState(true);
 
@@ -300,7 +304,11 @@ function Policies({ policies }) {
                   ))}
                 </div>
               )}
+              {p.status === "PENDING_PAYMENT" && (
+                <div className="mt-3 text-xs text-[#8A6412]">Waiting for payment. Your cover starts once it is confirmed (see Payments).</div>
+              )}
               {p.type === "HEALTH" && <HealthPolicyPanel policy={p} />}
+              <PolicyServicing policy={p} onChanged={onChanged} />
             </div>
           );
         })}
@@ -421,6 +429,7 @@ function FileClaim({ policies, onFiled }) {
             File another claim
           </button>
         </div>
+        <ClaimDocuments claimId={confirmed.id} />
       </div>
     );
   }
@@ -435,7 +444,7 @@ function FileClaim({ policies, onFiled }) {
           <select value={policyId} onChange={(e) => { setPolicyId(e.target.value); setDetails({}); }}
             className="w-full border border-[#E4E1D8] rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#16303F]">
             <option value="">Select a policy</option>
-            {policies.map((p) => (<option key={p.id} value={p.id}>{p.policyNumber} — {p.planName}</option>))}
+            {policies.filter((p) => p.status === "ACTIVE").map((p) => (<option key={p.id} value={p.id}>{p.policyNumber} — {p.planName}</option>))}
           </select>
           {errors.policyId && <p className="text-xs text-[#B0463D] mt-1">{errors.policyId}</p>}
         </div>
@@ -523,7 +532,7 @@ function Payments({ payments, policies, onPay }) {
     }
   };
 
-  const duePolicy = policies[0];
+  const duePolicy = policies.find((p) => p.status === "PENDING_PAYMENT") || policies.find((p) => p.status === "ACTIVE");
   return (
     <div>
       <h1 className="font-serif text-2xl text-[#16303F]">Payments</h1>
@@ -635,9 +644,10 @@ export default function App() {
         <div className="p-6 md:p-10">
           {loadError && <div className="mb-4 text-sm text-[#B0463D] flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {loadError}</div>}
           {active === "dashboard" && <Dashboard userName={user?.fullName} policies={policies} claims={claims} />}
-          {active === "policies" && <Policies policies={policies} />}
+          {active === "policies" && <Policies policies={policies} onChanged={loadAppData} />}
+          {active === "buy" && <BuyInsurance onPurchased={async () => { await loadAppData(); setActive("payments"); }} />}
           {active === "claim" && <FileClaim policies={policies} onFiled={(c) => setClaims([c, ...claims])} />}
-          {active === "payments" && <Payments payments={payments} policies={policies} onPay={(p) => setPayments([p, ...payments])} />}
+          {active === "payments" && <Payments payments={payments} policies={policies} onPay={(p) => { setPayments([p, ...payments]); loadAppData(); }} />}
           {active === "profile" && <Profile user={user} />}
         </div>
       </div>

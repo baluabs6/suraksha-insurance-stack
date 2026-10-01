@@ -9,6 +9,12 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/suraksha}
     username: ${SPRING_DATASOURCE_USERNAME:suraksha}
     password: ${SPRING_DATASOURCE_PASSWORD:suraksha_pw}
+  flyway:
+    # Versioned SQL migrations (db/migration). baseline-on-migrate lets this be switched on for a database
+    # that Hibernate created before Flyway existed; it is treated as version 1.
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
   jpa:
     hibernate:
       ddl-auto: update
@@ -30,6 +36,16 @@ fraud:
     base-url: ${FRAUD_SERVICE_URL:http://localhost:8081}
 
 app:
+  notifications:
+    email:
+      # E-mail copy of every in-app notification (claim status changes, renewals, policy activation).
+      # Off by default. To enable, set EMAIL_NOTIFICATIONS_ENABLED=true and the standard Spring mail settings
+      # (SPRING_MAIL_HOST, SPRING_MAIL_PORT, SPRING_MAIL_USERNAME, SPRING_MAIL_PASSWORD).
+      enabled: ${EMAIL_NOTIFICATIONS_ENABLED:false}
+      from: ${EMAIL_FROM:no-reply@suraksha.in}
+  policy:
+    # Share of the pro-rata premium kept when a customer cancels mid-term. Confirm against your product terms.
+    cancellation-fee-percent: ${POLICY_CANCELLATION_FEE_PERCENT:10}
   payments:
     # Instant "PAID" mock payments when Razorpay keys are blank. Local demo only:
     # keep false everywhere else (payments then return 503 instead of faking success).

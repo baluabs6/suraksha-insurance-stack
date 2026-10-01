@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +27,38 @@ public class FraudScoringService {
 
     @Value("${fraud.open-claims-threshold}")
     private int openClaimsThreshold;
+
+    private List<TypeSpecificRules.Finding> typeSpecificFindings(ClaimSubmittedEvent event, ClaimRecord claim, PolicyRecord policy) {
+        String policyType = policy == null ? null : policy.getType();
+        Map<String, Object> details = claim.getDetails();
+
+        long sameAsset = 0;
+        long sameAssetSameDay = 0;
+        String assetKey = TypeSpecificRules.assetKey(policyType);
+        if (assetKey != null && details != null && details.get(assetKey) != null) {
+            String value = TypeSpecificRules.normalizeIdentifier(details.get(assetKey).toString());
+            if (!value.isEmpty()) {
+                sameAsset = claimRecordRepository.countOtherClaimsWithAsset(event.claimId(), assetKey, value);
+                if (claim.getIncidentDate() != null) {
+                    sameAssetSameDay = claimRecordRepository.countOtherClaimsWithAssetOnDate(
+                            event.claimId(), assetKey, value, claim.getIncidentDate());
+                }
+            }
+        }
+
+        long repeatCategory = 0;
+        String category = TypeSpecificRules.category(details);
+        if (category != null) {
+            repeatCategory = claimRecordRepository.countOtherClaimsOnPolicyWithCategory(event.policyId(), event.claimId(), category);
+        }
+
+        return TypeSpecificRules.evaluate(new TypeSpecificRules.Input(
+                policyType,
+                policy == null ? null : policy.getStartDate(),
+                policy == null ? null : policy.getEndDate(),
+                claim.getIncidentDate(), claim.getSubmittedAt(), details,
+                sameAsset, sameAssetSameDay, repeatCategory));
+    }
 
     public record ScoringResult(double riskScore, String riskLevel, List<String> flags) {
     }
@@ -56,6 +89,14 @@ public class FraudScoringService {
 
         if (event.claimAmount().remainder(BigDecimal.valueOf(1000)).compareTo(BigDecimal.ZERO) == 0) {
             score += 0.05;
+        }
+
+        ClaimRecord claim = claimRecordRepository.findById(event.claimId()).orElse(null);
+        if (claim != null) {
+            for (TypeSpecificRules.Finding finding : typeSpecificFindings(event, claim, policy)) {
+                flags.add(finding.flag());
+                score += finding.score();
+            }
         }
 
         score = Math.min(score, 1.0);

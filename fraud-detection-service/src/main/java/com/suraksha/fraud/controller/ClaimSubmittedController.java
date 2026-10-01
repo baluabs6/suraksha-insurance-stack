@@ -36,6 +36,7 @@ public class ClaimSubmittedController {
                 (ClaimRecord claim) -> {
                     claim.setRiskScore(result.riskScore());
                     claim.setRiskLevel(result.riskLevel());
+                    claim.setRiskFlags(result.flags().isEmpty() ? null : String.join(",", result.flags()));
                     claimRecordRepository.save(claim);
                 },
                 () -> log.warn("Claim {} not found when trying to record risk score — it may not have "

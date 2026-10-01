@@ -23,6 +23,7 @@ public class ClaimRecord {
     private String description;
     private Double riskScore;
     private String riskLevel;
+    private String riskFlags;
 
     @Enumerated(EnumType.STRING)
     private ClaimStatusView status;

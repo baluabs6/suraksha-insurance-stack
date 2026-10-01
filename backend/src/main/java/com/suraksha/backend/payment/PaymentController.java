@@ -2,6 +2,7 @@ package com.suraksha.backend.payment;
 
 import com.suraksha.backend.payment.gateway.RazorpayClient;
 import com.suraksha.backend.policy.Policy;
+import com.suraksha.backend.policy.PolicyActivationService;
 import com.suraksha.backend.policy.PolicyRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +23,7 @@ public class PaymentController {
     private final PaymentRepository paymentRepository;
     private final PolicyRepository policyRepository;
     private final RazorpayClient razorpayClient;
+    private final PolicyActivationService policyActivationService;
 
     @Value("${app.payments.mock-enabled:false}")
     private boolean mockPaymentsEnabled;
@@ -52,6 +54,7 @@ public class PaymentController {
                     .status(PaymentStatus.PAID).paidAt(Instant.now())
                     .build();
             paymentRepository.save(payment);
+            policyActivationService.activateIfPending(policy.getId());
             return ResponseEntity.status(201).body(Map.of("mock", true, "payment", payment));
         }
 

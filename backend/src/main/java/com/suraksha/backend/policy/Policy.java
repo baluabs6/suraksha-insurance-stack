@@ -40,8 +40,9 @@ public class Policy {
     @Column(nullable = false)
     private String planName;
 
+    // columnDefinition (no CHECK constraint): adding an enum value must never require a schema change again.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(32)")
     private PolicyType type;
 
     @Column(nullable = false)
@@ -76,6 +77,11 @@ public class Policy {
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(32)")
     private PolicyStatus status = PolicyStatus.ACTIVE;
+
+    /** Set when the customer cancels; refundAmount is what is owed back (payout is handled outside this service). */
+    private java.time.Instant cancelledAt;
+
+    private BigDecimal refundAmount;
 }

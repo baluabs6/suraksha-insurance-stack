@@ -14,6 +14,8 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
 
+import reactor.core.publisher.Flux;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,6 +57,8 @@ public class SupportChatService {
             - If the question needs a human (a specific claim dispute, a complaint,
               anything you can't resolve from the tools), tell them to contact
               support or use the claims section of the app instead of guessing.
+            - Always write your reply in English, whatever language the customer
+              writes in. It is translated for them afterwards.
             - Keep answers to 3-4 sentences.
             """;
 
@@ -69,18 +73,7 @@ public class SupportChatService {
         }
         String memoryKey = memoryKey(userId, conversationId);
 
-        StringBuilder user = new StringBuilder();
-        if (policySummaries != null && !policySummaries.isEmpty()) {
-            user.append("Policy summary shown in the app (may be out of date): ")
-                    .append(PromptGuard.wrapUntrusted(String.join("; ", policySummaries)))
-                    .append("\n\n");
-        }
-        user.append("Customer question: ").append(PromptGuard.wrapUntrusted(message));
-
-        // Redact before the message is sent *and* before the memory advisor persists it.
-        Prompt prompt = new Prompt(
-                List.of(new SystemMessage(SYSTEM_PROMPT), new UserMessage(PiiRedactor.redact(user.toString()))),
-                ChatOptions.builder().maxTokens(MAX_TOKENS).build());
+        Prompt prompt = buildPrompt(message, policySummaries);
 
         try {
             String text = anthropicClient.chatClient().prompt(prompt)
@@ -95,6 +88,37 @@ public class SupportChatService {
             log.error("Support chat call failed.", e);
             return Optional.empty();
         }
+    }
+
+    /** Same call as {@link #reply} but as a stream of text chunks. Empty flux when the key isn't configured. */
+    public Flux<String> stream(String userId, String conversationId, String message, List<String> policySummaries) {
+        if (!anthropicClient.isConfigured()) {
+            return Flux.empty();
+        }
+        String memoryKey = memoryKey(userId, conversationId);
+        Prompt prompt = buildPrompt(message, policySummaries);
+        return anthropicClient.chatClient().prompt(prompt)
+                .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, memoryKey))
+                .tools(supportTools)
+                .toolContext(Map.of(SupportTools.USER_ID_KEY, userId))
+                .stream()
+                .content();
+    }
+
+    private static Prompt buildPrompt(String message, List<String> policySummaries) {
+        StringBuilder user = new StringBuilder();
+        if (policySummaries != null && !policySummaries.isEmpty()) {
+            user.append("Policy summary shown in the app (may be out of date): ")
+                    .append(PromptGuard.wrapUntrusted(String.join("; ", policySummaries)))
+                    .append("\n\n");
+        }
+        user.append("Customer question: ").append(PromptGuard.wrapUntrusted(message));
+
+        // Redact before the message is sent *and* before the memory advisor persists it.
+        return new Prompt(
+                List.of(new SystemMessage(SYSTEM_PROMPT), new UserMessage(PiiRedactor.redact(user.toString()))),
+                ChatOptions.builder().maxTokens(MAX_TOKENS).build());
     }
 
     public void clearConversation(String userId, String conversationId) {

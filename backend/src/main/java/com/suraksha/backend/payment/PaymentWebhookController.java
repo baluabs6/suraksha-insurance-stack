@@ -3,6 +3,7 @@ package com.suraksha.backend.payment;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.suraksha.backend.payment.gateway.WebhookSignatureVerifier;
+import com.suraksha.backend.policy.PolicyActivationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -20,6 +22,7 @@ public class PaymentWebhookController {
 
     private final WebhookSignatureVerifier signatureVerifier;
     private final PaymentRepository paymentRepository;
+    private final PolicyActivationService policyActivationService;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @PostMapping("/api/payments/webhook")
@@ -53,6 +56,8 @@ public class PaymentWebhookController {
                     payment.setGatewayTxnId(paymentId);
                     payment.setPaidAt(Instant.now());
                     paymentRepository.save(payment);
+                    UUID policyId = paymentRepository.findPolicyIdByPaymentId(payment.getId());
+                    if (policyId != null) policyActivationService.activateIfPending(policyId);
                     log.info("Payment {} confirmed PAID via webhook (order {})", payment.getId(), orderId);
                 }
                 case "payment.failed" -> {

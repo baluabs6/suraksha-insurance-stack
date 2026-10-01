@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  java:
+    name: ${{ matrix.service }} (build and test)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, fraud-detection-service, ai-service]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: ${{ matrix.service }}/pom.xml
+      - name: Build and run tests
+        working-directory: ${{ matrix.service }}
+        run: mvn -B -ntp verify
+
+  frontend:
+    name: frontend (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install and build
+        working-directory: frontend
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+  docker:
+    name: docker build (${{ matrix.context }})
+    needs: [java, frontend]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        context: [backend, fraud-detection-service, ai-service, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (not pushed)
+        run: docker build ./${{ matrix.context }}

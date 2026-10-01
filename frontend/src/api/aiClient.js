@@ -2,10 +2,9 @@ import axios from "axios";
 
 const AI_API_BASE_URL = import.meta.env.VITE_AI_API_BASE_URL || "http://localhost:8082";
 
-// ai-service isn't behind the same auth as the main backend in this demo —
-// see the comment in ChatController/RecommendationController for what a
-// production setup needs (gateway-level JWT validation, no client-supplied context).
-const aiApi = axios.create({ baseURL: AI_API_BASE_URL });
+// ai-service validates the same access_token cookie the backend issues, so requests must send credentials
+// (and ai-service allows this origin via app.cors.allowed-origin).
+const aiApi = axios.create({ baseURL: AI_API_BASE_URL, withCredentials: true });
 
 export default aiApi;
 
@@ -40,4 +39,56 @@ export function askAdjuster({ question, policyId, riskLevel }) {
 // Forget the server-side history for one support-chat conversation ("New chat").
 export function clearChatConversation(conversationId) {
   return aiApi.delete(`/api/ai/chat/${encodeURIComponent(conversationId)}`);
+}
+
+// Non-streaming chat. language: "en", "hi", "te", "ta", "kn", "ml", "mr", "bn" or "gu".
+export function sendChat({ message, conversationId, language }) {
+  return aiApi.post("/api/ai/chat", { message, conversationId, language }).then((res) => res.data.reply);
+}
+
+function parseSseEvent(raw) {
+  let event = "message";
+  const data = [];
+  for (const line of raw.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data.push(line.slice(5));
+  }
+  return { event, data: data.join("\n") };
+}
+
+// Streaming chat (English only). Calls onToken(text) as text arrives and resolves with the final, guard-checked
+// text from the "done" event; the caller should show that text instead of what it streamed.
+export async function streamChat({ message, conversationId }, onToken) {
+  const res = await fetch(`${AI_API_BASE_URL}/api/ai/chat/stream`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify({ message, conversationId, language: "en" }),
+  });
+  if (!res.ok || !res.body) {
+    const err = new Error("Chat stream failed");
+    err.status = res.status;
+    throw err;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalText = null;
+
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop();
+    for (const raw of events) {
+      const { event, data } = parseSseEvent(raw);
+      if (!data) continue;
+      const text = JSON.parse(data);
+      if (event === "token") onToken?.(text);
+      else if (event === "done") finalText = text;
+    }
+  }
+  return finalText;
 }

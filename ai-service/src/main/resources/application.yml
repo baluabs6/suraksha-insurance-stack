@@ -41,6 +41,8 @@ fraud:
   open-claims-threshold: ${FRAUD_OPEN_CLAIMS_THRESHOLD:2}
 
 app:
+  cors:
+    allowed-origin: ${APP_CORS_ORIGIN:http://localhost:5173}
   jwt:
     # Must match backend's app.jwt.secret exactly — ai-service only verifies
     # tokens backend issues, it never issues its own.
@@ -54,12 +56,21 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info
+        include: health, info, prometheus
   endpoint:
     health:
       probes:
         enabled: true
       show-details: never
+  metrics:
+    tags:
+      application: ai-service
+
+ai:
+  limits:
+    # Per signed-in user, per replica. Raise or lower to fit your AI budget.
+    requests-per-minute: ${AI_REQUESTS_PER_MINUTE:20}
+    requests-per-day: ${AI_REQUESTS_PER_DAY:200}
 
 anthropic:
   api-key: ${ANTHROPIC_API_KEY:}

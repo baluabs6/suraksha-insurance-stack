@@ -105,6 +105,15 @@ public class Claim {
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> details;
 
+    /** Fraud-screening flags that fired, comma-separated (written by fraud-detection-service). */
+    @Column(length = 500)
+    private String riskFlags;
+
+    /** Adjuster working this claim (self-assigned from the workbench). */
+    private UUID assignedAdjusterId;
+
+    private Instant assignedAt;
+
     @Column(name = "status_updated_by")
     private UUID statusUpdatedBy;
 

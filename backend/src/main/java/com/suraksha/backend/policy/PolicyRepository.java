@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public interface PolicyRepository extends JpaRepository<Policy, UUID> {
     List<Policy> findByUserId(UUID userId);
+    boolean existsByPolicyNumber(String policyNumber);
     List<Policy> findByAgentIdOrderByStartDateDesc(UUID agentId);
     List<Policy> findByEndDateBetweenAndStatus(LocalDate from, LocalDate to, PolicyStatus status);
 }

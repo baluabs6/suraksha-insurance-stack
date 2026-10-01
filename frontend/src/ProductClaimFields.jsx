@@ -5,13 +5,13 @@ const input = "w-full border border-[#E4E1D8] rounded px-3 py-2 text-sm focus:ou
 const label = "text-sm text-[#16303F] block mb-1";
 
 /** Renders the claim form for any insurance type from the backend's field definitions. */
-export default function ProductClaimFields({ product, values, onChange, errors }) {
+export default function ProductClaimFields({ product, values, onChange, errors, heading }) {
   if (!product || product.claimFields.length === 0) return null;
   const set = (key, value) => onChange({ ...values, [key]: value });
 
   return (
     <div className="space-y-5 pt-1">
-      <div className="text-xs uppercase tracking-wide text-[#4B5563]">{product.label} claim details</div>
+      <div className="text-xs uppercase tracking-wide text-[#4B5563]">{heading || `${product.label} claim details`}</div>
       {product.claimFields.map((f) => {
         const required = isFieldRequired(f, values);
         const error = errors[`detail_${f.key}`];
